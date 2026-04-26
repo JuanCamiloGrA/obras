@@ -6,12 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:init": "bun scripts/init-d1.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1037.0",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
+    "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
     "@types/node": "^20",

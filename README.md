@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ensayo de Obras
 
-## Getting Started
+Aplicación interna para cargar guiones de teatro y repasarlos desde el celular.
 
-First, run the development server:
+## Qué incluye
+
+- Frente público de solo lectura.
+- Panel oculto en `/tramoya`.
+- Login hardcodeado:
+  - Usuario: `admin`
+  - Contraseña: `12345678`
+- Editor Markdown con soporte para imágenes y audio.
+- Actores por obra.
+- Asignación de fragmentos del texto a uno o varios actores.
+- Opción de publicar, ocultar y marcar una única `obra activa`.
+- Selección pública de actor con persistencia en `localStorage`.
+- Persistencia real preparada para Cloudflare D1.
+- Archivos multimedia persistentes preparados para Cloudflare R2.
+
+## Variables de entorno
+
+Copia `.env.example` a `.env.local` y completa:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+CLOUDFLARE_ACCOUNT_ID=""
+CLOUDFLARE_D1_DATABASE_ID=""
+CLOUDFLARE_D1_API_TOKEN=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET_NAME=""
+R2_PUBLIC_BASE_URL=""
+# Optional. If omitted, the app uses https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ENDPOINT=""
+```
+
+## Desarrollo
+
+1. Instala dependencias:
+
+```bash
+bun install
+```
+
+2. Crea las tablas en D1:
+
+```bash
+bun run db:init
+```
+
+3. Levanta el proyecto:
+
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Despliegue
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- La app está lista para desplegar en Vercel.
+- El contenido editorial vive en Cloudflare D1 vía API segura.
+- Imágenes y audios se guardan en Cloudflare R2.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## R2 público
 
-## Learn More
+`R2_PUBLIC_BASE_URL` debe apuntar al dominio público desde el que servirás los archivos del bucket.
 
-To learn more about Next.js, take a look at the following resources:
+Ejemplos:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `https://pub-xxxx.r2.dev`
+- `https://media.tudominio.com`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Nota operativa
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Cloudflare recomienda acceder a D1 desde fuera de Workers mediante un proxy Worker propio para tráfico alto. Esta implementación habla con la API HTTPS de D1 directamente desde el servidor de Next, lo cual simplifica la puesta en marcha y funciona bien para una app interna de bajo volumen.
