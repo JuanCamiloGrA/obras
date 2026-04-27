@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -9,7 +9,6 @@ import {
   deleteActorAction,
   deleteAssignmentAction,
   saveAssignmentAction,
-  savePlayAction,
   setPlayActiveAction,
   setPlayHiddenAction,
   setPlayPublishedAction,
@@ -24,9 +23,50 @@ type PlayEditorProps = {
   play: AdminPlayDetail;
 };
 
+type DraftSnapshot = {
+  title: string;
+  slug: string;
+  markdown: string;
+};
+
+type SaveState = "saved" | "dirty" | "saving" | "error";
+
+type SaveResponse = {
+  ok: boolean;
+  error?: string;
+  slug?: string;
+  savedAt?: string;
+};
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+const AUTOSAVE_MIN_INTERVAL_MS = 5000;
+
+function makeDraftSnapshot(title: string, slug: string, markdown: string): DraftSnapshot {
+  return { title, slug, markdown };
+}
+
+function serializeDraft(snapshot: DraftSnapshot) {
+  return [snapshot.title, snapshot.slug, snapshot.markdown].join("\u0000");
+}
+
+function formatSavedTime(savedAt: string) {
+  return new Date(savedAt).toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function PlayEditor({ play }: PlayEditorProps) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const initialDraft = makeDraftSnapshot(play.title, play.slug, play.markdown);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const draftRef = useRef(initialDraft);
+  const lastSavedDraftRef = useRef(initialDraft);
+  const inFlightDraftRef = useRef<DraftSnapshot | null>(null);
+  const queuedDraftRef = useRef<DraftSnapshot | null>(null);
+  const queuedSyncRef = useRef(false);
+  const lastAutosaveAtRef = useRef(0);
   const [title, setTitle] = useState(play.title);
   const [slug, setSlug] = useState(play.slug);
   const [markdown, setMarkdown] = useState(play.markdown);
@@ -40,7 +80,195 @@ export function PlayEditor({ play }: PlayEditorProps) {
   });
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [saveError, setSaveError] = useState("");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const clearAutosaveTimer = useCallback(() => {
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+  }, []);
+
+  const persistDraft = useCallback(
+    async (
+      snapshot: DraftSnapshot,
+      options: {
+        force?: boolean;
+        keepalive?: boolean;
+        sync?: boolean;
+      } = {},
+    ) => {
+      const snapshotKey = serializeDraft(snapshot);
+      const lastSavedKey = serializeDraft(lastSavedDraftRef.current);
+
+      if (!options.force && snapshotKey === lastSavedKey) {
+        return true;
+      }
+
+      if (inFlightDraftRef.current) {
+        queuedDraftRef.current = snapshot;
+        queuedSyncRef.current = queuedSyncRef.current || Boolean(options.sync);
+        return true;
+      }
+
+      inFlightDraftRef.current = snapshot;
+      clearAutosaveTimer();
+      setSaveState("saving");
+      setSaveError("");
+
+      try {
+        const response = await fetch(`/api/tramoya/obras/${play.id}/save`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: snapshot.title,
+            slug: snapshot.slug,
+            markdown: snapshot.markdown,
+            sync: options.sync === true,
+          }),
+          keepalive: options.keepalive === true,
+          credentials: "same-origin",
+        });
+
+        const result = (await response.json()) as SaveResponse;
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "No se pudo guardar la obra.");
+        }
+
+        const savedSnapshot = {
+          ...snapshot,
+          slug: result.slug || snapshot.slug,
+        };
+
+        lastSavedDraftRef.current = savedSnapshot;
+        lastAutosaveAtRef.current = Date.now();
+        setLastSavedAt(result.savedAt || new Date().toISOString());
+        setSaveState("saved");
+        setSaveError("");
+
+        if (result.slug && draftRef.current.slug === snapshot.slug && result.slug !== snapshot.slug) {
+          setSlug(result.slug);
+          draftRef.current = {
+            ...draftRef.current,
+            slug: result.slug,
+          };
+        }
+
+        return true;
+      } catch (caughtError) {
+        setSaveState("error");
+        setSaveError(caughtError instanceof Error ? caughtError.message : "No se pudo guardar la obra.");
+        return false;
+      } finally {
+        inFlightDraftRef.current = null;
+
+        if (queuedDraftRef.current) {
+          const nextDraft = queuedDraftRef.current;
+          const shouldSync = queuedSyncRef.current;
+
+          queuedDraftRef.current = null;
+          queuedSyncRef.current = false;
+          void persistDraft(nextDraft, { force: true, sync: shouldSync });
+        } else if (serializeDraft(draftRef.current) !== serializeDraft(lastSavedDraftRef.current)) {
+          setSaveState((current) => (current === "error" ? current : "dirty"));
+          const dueAt = Math.max(
+            Date.now() + AUTOSAVE_DEBOUNCE_MS,
+            lastAutosaveAtRef.current + AUTOSAVE_MIN_INTERVAL_MS,
+          );
+
+          autosaveTimerRef.current = window.setTimeout(() => {
+            void persistDraft(draftRef.current);
+          }, Math.max(0, dueAt - Date.now()));
+        }
+      }
+    },
+    [clearAutosaveTimer, play.id],
+  );
+
+  const scheduleAutosave = useCallback(() => {
+    clearAutosaveTimer();
+
+    if (serializeDraft(draftRef.current) === serializeDraft(lastSavedDraftRef.current)) {
+      return;
+    }
+
+    const dueAt = Math.max(Date.now() + AUTOSAVE_DEBOUNCE_MS, lastAutosaveAtRef.current + AUTOSAVE_MIN_INTERVAL_MS);
+
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void persistDraft(draftRef.current);
+    }, Math.max(0, dueAt - Date.now()));
+  }, [clearAutosaveTimer, persistDraft]);
+
+  const flushDraft = useCallback(
+    async (options: { keepalive?: boolean; sync?: boolean } = {}) => {
+      clearAutosaveTimer();
+
+      if (serializeDraft(draftRef.current) === serializeDraft(lastSavedDraftRef.current)) {
+        return true;
+      }
+
+      return persistDraft(draftRef.current, {
+        force: true,
+        keepalive: options.keepalive,
+        sync: options.sync,
+      });
+    },
+    [clearAutosaveTimer, persistDraft],
+  );
+
+  useEffect(() => {
+    draftRef.current = makeDraftSnapshot(title, slug, markdown);
+
+    if (serializeDraft(draftRef.current) === serializeDraft(lastSavedDraftRef.current)) {
+      clearAutosaveTimer();
+      setSaveState((current) => (current === "saving" || current === "error" ? current : "saved"));
+      return;
+    }
+
+    setSaveState((current) => (current === "saving" || current === "error" ? current : "dirty"));
+    scheduleAutosave();
+  }, [clearAutosaveTimer, scheduleAutosave, title, slug, markdown]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void flushDraft({ keepalive: true });
+      }
+    }
+
+    function handlePageHide() {
+      void flushDraft({ keepalive: true });
+    }
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (
+        serializeDraft(draftRef.current) === serializeDraft(lastSavedDraftRef.current) &&
+        !inFlightDraftRef.current
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearAutosaveTimer();
+    };
+  }, [clearAutosaveTimer, flushDraft]);
 
   function refreshSelection() {
     const textarea = textareaRef.current;
@@ -61,25 +289,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
   }
 
   function savePlay() {
-    const formData = new FormData();
-    formData.set("id", play.id);
-    formData.set("title", title);
-    formData.set("slug", slug);
-    formData.set("markdown", markdown);
-
-    startTransition(async () => {
-      setFeedback("");
-      setError("");
-      const result = await savePlayAction(formData);
-
-      if (!result.ok) {
-        setError(result.error || "No se pudo guardar la obra.");
-        return;
-      }
-
-      setFeedback("Cambios guardados.");
-      router.refresh();
-    });
+    void flushDraft({ sync: true });
   }
 
   function createActor() {
@@ -88,6 +298,10 @@ export function PlayEditor({ play }: PlayEditorProps) {
     formData.set("name", actorName);
 
     startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
       setFeedback("");
       setError("");
       const result = await createActorAction(formData);
@@ -109,6 +323,10 @@ export function PlayEditor({ play }: PlayEditorProps) {
     formData.set("actorId", actorId);
 
     startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
       setFeedback("");
       setError("");
       const result = await deleteActorAction(formData);
@@ -136,6 +354,10 @@ export function PlayEditor({ play }: PlayEditorProps) {
     formData.set("actorIds", selectedActorIds.join(","));
 
     startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
       setFeedback("");
       setError("");
       const result = await saveAssignmentAction(formData);
@@ -156,6 +378,10 @@ export function PlayEditor({ play }: PlayEditorProps) {
     formData.set("assignmentId", assignmentId);
 
     startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
       setFeedback("");
       setError("");
       const result = await deleteAssignmentAction(formData);
@@ -176,6 +402,10 @@ export function PlayEditor({ play }: PlayEditorProps) {
     formData.set(field, String(value));
 
     startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
       setFeedback("");
       setError("");
 
@@ -211,7 +441,6 @@ export function PlayEditor({ play }: PlayEditorProps) {
 
     const nextValue = insertAtSelection(markdown, start, end, snippet);
     setMarkdown(nextValue);
-    setFeedback("Bloque insertado en el Markdown.");
 
     requestAnimationFrame(() => {
       textarea?.focus();
@@ -221,17 +450,45 @@ export function PlayEditor({ play }: PlayEditorProps) {
     });
   }
 
+  function refreshVotes() {
+    startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
+  const saveStatusLabel =
+    saveState === "saving"
+      ? "Guardando..."
+      : saveState === "dirty"
+        ? "Cambios pendientes"
+        : saveState === "error"
+          ? "No se pudo guardar"
+          : lastSavedAt
+            ? `Guardado a las ${formatSavedTime(lastSavedAt)}`
+            : "Sin cambios pendientes";
+
   return (
     <div className="stackLg">
-      <div className="spaceBetween wrapGap">
+      <div className="spaceBetween wrapGap startAligned">
         <div>
           <p className="eyebrow">Editor de obra</p>
-          <h1>{play.title}</h1>
+          <h1>{title}</h1>
         </div>
 
-        <Link className="button ghost" href={ADMIN_PANEL_PATH}>
-          Volver al panel
-        </Link>
+        <div className="stackXs saveStatusGroup">
+          <span className={`saveIndicator ${saveState}`} aria-live="polite">
+            <span className="saveIndicatorDot" aria-hidden="true" />
+            {saveStatusLabel}
+          </span>
+
+          <Link className="button ghost" href={ADMIN_PANEL_PATH}>
+            Volver al panel
+          </Link>
+        </div>
       </div>
 
       <section className="panel stackMd">
@@ -288,12 +545,20 @@ export function PlayEditor({ play }: PlayEditorProps) {
           <section className="panel stackMd">
             <label className="field">
               <span>Título</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} />
+              <input
+                value={title}
+                onBlur={() => void flushDraft()}
+                onChange={(event) => setTitle(event.target.value)}
+              />
             </label>
 
             <label className="field">
               <span>Slug público</span>
-              <input value={slug} onChange={(event) => setSlug(event.target.value)} />
+              <input
+                value={slug}
+                onBlur={() => void flushDraft()}
+                onChange={(event) => setSlug(event.target.value)}
+              />
             </label>
 
             <label className="field">
@@ -301,20 +566,28 @@ export function PlayEditor({ play }: PlayEditorProps) {
               <textarea
                 ref={textareaRef}
                 value={markdown}
+                onBlur={() => {
+                  refreshSelection();
+                  void flushDraft();
+                }}
                 onChange={(event) => setMarkdown(event.target.value)}
-                onSelect={refreshSelection}
                 onKeyUp={refreshSelection}
+                onSelect={refreshSelection}
                 rows={22}
                 placeholder="# Acto 1\n\nEscribe el guion aquí..."
               />
             </label>
 
-            <div className="spaceBetween wrapGap">
-              <button className="button primary" type="button" onClick={savePlay} disabled={isPending}>
-                Guardar obra
-              </button>
+            <div className="spaceBetween wrapGap startAligned">
+              <div className="stackXs">
+                <button className="button primary" type="button" onClick={savePlay} disabled={isPending}>
+                  Guardar y sincronizar
+                </button>
+                {saveError ? <p className="feedback error">{saveError}</p> : null}
+              </div>
+
               <p className="mutedText">
-                Selecciona texto directo dentro del editor para asignarlo a actores.
+                El editor guarda en segundo plano y evita escrituras repetidas mientras sigues escribiendo.
               </p>
             </div>
           </section>
@@ -443,7 +716,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
                 </p>
               </div>
 
-              <button className="button ghost" type="button" onClick={() => router.refresh()} disabled={isPending}>
+              <button className="button ghost" type="button" onClick={refreshVotes} disabled={isPending}>
                 Actualizar votos
               </button>
             </div>
@@ -495,7 +768,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
         </div>
 
         <section className="panel stackMd previewPanel">
-          <div className="spaceBetween wrapGap">
+          <div className="spaceBetween wrapGap startAligned">
             <div>
               <p className="eyebrow">Vista previa</p>
               <h2>Cómo lo verá el actor</h2>
