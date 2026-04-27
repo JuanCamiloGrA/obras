@@ -1,93 +1,111 @@
-import { visit } from "unist-util-visit";
-
 type HighlightRange = {
   startOffset: number;
   endOffset: number;
 };
 
-type TextNode = {
-  type: "text";
-  value: string;
+type GenericNode = Record<string, unknown> & {
+  type?: string;
+  value?: string;
+  children?: GenericNode[];
   position?: {
     start?: { offset?: number };
     end?: { offset?: number };
   };
 };
 
-type ParentNode = {
-  children: Array<Record<string, unknown>>;
-};
+function isNode(value: unknown): value is GenericNode {
+  return typeof value === "object" && value !== null;
+}
+
+function splitTextNode(node: GenericNode, ranges: HighlightRange[]) {
+  const value = typeof node.value === "string" ? node.value : "";
+  const start = node.position?.start?.offset;
+  const end = node.position?.end?.offset;
+
+  if (typeof start !== "number" || typeof end !== "number") {
+    return [node];
+  }
+
+  const overlaps = ranges.filter((range) => range.endOffset > start && range.startOffset < end);
+
+  if (!overlaps.length) {
+    return [node];
+  }
+
+  const nextChildren: GenericNode[] = [];
+  let cursor = start;
+
+  for (const range of overlaps) {
+    const segmentStart = Math.max(range.startOffset, start);
+    const segmentEnd = Math.min(range.endOffset, end);
+
+    if (segmentStart > cursor) {
+      nextChildren.push({
+        type: "text",
+        value: value.slice(cursor - start, segmentStart - start),
+      });
+    }
+
+    if (segmentEnd > segmentStart) {
+      nextChildren.push({
+        type: "strong",
+        data: {
+          hName: "span",
+          hProperties: {
+            className: ["actor-highlight"],
+          },
+        },
+        children: [
+          {
+            type: "text",
+            value: value.slice(segmentStart - start, segmentEnd - start),
+          },
+        ],
+      });
+    }
+
+    cursor = Math.max(cursor, segmentEnd);
+  }
+
+  if (cursor < end) {
+    nextChildren.push({
+      type: "text",
+      value: value.slice(cursor - start),
+    });
+  }
+
+  return nextChildren;
+}
+
+function transformNode(node: unknown, ranges: HighlightRange[]): GenericNode[] {
+  if (!isNode(node)) {
+    return [];
+  }
+
+  if (node.type === "text") {
+    return splitTextNode(node, ranges);
+  }
+
+  if (Array.isArray(node.children)) {
+    return [
+      {
+        ...node,
+        children: node.children.flatMap((child) => transformNode(child, ranges)),
+      },
+    ];
+  }
+
+  return [node];
+}
 
 export function remarkHighlightActor(ranges: HighlightRange[]) {
   const sortedRanges = [...ranges].sort((a, b) => a.startOffset - b.startOffset);
 
-  return function transformer(tree: Record<string, unknown>) {
-    visit(tree as never, "text", (node, index, parent) => {
-      if (index === undefined || !parent) {
-        return;
-      }
+  return function transformer(tree: unknown) {
+    if (!isNode(tree) || !Array.isArray(tree.children)) {
+      return;
+    }
 
-      const textNode = node as TextNode;
-      const parentNode = parent as ParentNode;
-      const start = textNode.position?.start?.offset;
-      const end = textNode.position?.end?.offset;
-
-      if (typeof start !== "number" || typeof end !== "number") {
-        return;
-      }
-
-      const overlaps = sortedRanges.filter(
-        (range) => range.endOffset > start && range.startOffset < end,
-      );
-
-      if (!overlaps.length) {
-        return;
-      }
-
-      const nextChildren: Array<Record<string, unknown>> = [];
-      let cursor = start;
-
-      for (const range of overlaps) {
-        const segmentStart = Math.max(range.startOffset, start);
-        const segmentEnd = Math.min(range.endOffset, end);
-
-        if (segmentStart > cursor) {
-          nextChildren.push({
-            type: "text",
-            value: textNode.value.slice(cursor - start, segmentStart - start),
-          });
-        }
-
-        if (segmentEnd > segmentStart) {
-          nextChildren.push({
-            type: "strong",
-            data: {
-              hName: "span",
-              hProperties: {
-                className: ["actor-highlight"],
-              },
-            },
-            children: [
-              {
-                type: "text",
-                value: textNode.value.slice(segmentStart - start, segmentEnd - start),
-              },
-            ],
-          });
-        }
-
-        cursor = Math.max(cursor, segmentEnd);
-      }
-
-      if (cursor < end) {
-        nextChildren.push({
-          type: "text",
-          value: textNode.value.slice(cursor - start),
-        });
-      }
-
-      parentNode.children.splice(index, 1, ...nextChildren);
-      return index + nextChildren.length;
-    });
+    tree.children = tree.children.flatMap((child) => transformNode(child, sortedRanges));
   };
 }
