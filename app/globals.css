@@ -1067,10 +1067,19 @@ main {
 }
 
 .audioPlayerButton.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 4.1rem;
   background: #fff5f5;
   color: #7f1d1d;
   font-size: 1.12rem;
+}
+
+.audioPlayerIcon {
+  width: 1.65rem;
+  height: 1.65rem;
+  stroke-width: 2.2;
 }
 
 .actor-highlight {
