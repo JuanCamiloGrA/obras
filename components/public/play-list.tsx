@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PwaCacheHint } from "@/components/public/pwa-cache-hint";
 import type { PublicPlaySummary } from "@/lib/types";
 
 type PlayListProps = {
@@ -9,8 +10,12 @@ type PlayListProps = {
 };
 
 export function PlayList({ plays, title, description }: PlayListProps) {
+  const cacheUrls = ["/", "/obras", ...plays.map((play) => `/obras/${play.slug}`)];
+
   return (
     <main className="pageShell stackLg">
+      <PwaCacheHint urls={cacheUrls} />
+
       <section className="heroBlock stackSm">
         <p className="eyebrow">Guiones disponibles</p>
         <h1>{title}</h1>
