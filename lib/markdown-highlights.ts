@@ -127,11 +127,13 @@ function transformNode(node: unknown, ranges: HighlightRange[]): GenericNode[] {
 export function remarkHighlightActor(ranges: HighlightRange[]) {
   const normalizedRanges = normalizeRanges(ranges);
 
-  return function transformer(tree: unknown) {
-    if (!normalizedRanges.length || !isNode(tree) || !Array.isArray(tree.children)) {
-      return;
-    }
+  return function attachHighlightActor() {
+    return function transformer(tree: unknown) {
+      if (!normalizedRanges.length || !isNode(tree) || !Array.isArray(tree.children)) {
+        return;
+      }
 
-    tree.children = tree.children.flatMap((child) => transformNode(child, normalizedRanges));
+      tree.children = tree.children.flatMap((child) => transformNode(child, normalizedRanges));
+    };
   };
 }
