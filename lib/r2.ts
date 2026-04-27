@@ -40,6 +40,7 @@ function getR2Client() {
       region: "auto",
       endpoint: config.endpoint,
       forcePathStyle: true,
+      requestChecksumCalculation: "WHEN_REQUIRED",
       credentials: {
         accessKeyId: config.accessKeyId,
         secretAccessKey: config.secretAccessKey,
