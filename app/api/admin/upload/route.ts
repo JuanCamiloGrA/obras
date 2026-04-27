@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 
 import { isAdminAuthenticated } from "@/lib/auth";
+import { buildMediaPath } from "@/lib/media";
 import { uploadToR2 } from "@/lib/r2";
 import { sanitizeFilename } from "@/lib/utils";
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      url: uploaded.url,
+      url: buildMediaPath(uploaded.key),
     });
   } catch (error) {
     return NextResponse.json(

@@ -45,8 +45,8 @@ export default function RootLayout({
   return (
     <html lang="es" className={geistSans.variable}>
       <body>
-        <PublicPwaBanner />
         {children}
+        <PublicPwaBanner />
       </body>
     </html>
   );

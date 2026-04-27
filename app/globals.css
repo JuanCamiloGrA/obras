@@ -83,40 +83,16 @@ main {
 }
 
 .pwaBanner {
-  position: sticky;
-  top: 0;
-  z-index: 30;
+  width: min(100%, 72rem);
+  margin: 0 auto;
+  padding: 0 1rem 1.5rem;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(111, 29, 27, 0.12);
-  background: rgba(250, 245, 238, 0.96);
-  backdrop-filter: blur(12px);
-}
-
-.pwaBannerTitle {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.pwaBannerText {
-  max-width: 52rem;
-  font-size: 0.95rem;
-}
-
-.pwaInstallHint {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.pwaBannerActions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.6rem;
+}
+
+.pwaInstallButton {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
 }
 
 .adminShell {
@@ -624,11 +600,6 @@ main {
   font-weight: 700;
 }
 
-.pwaNote {
-  color: var(--success);
-  font-size: 0.94rem;
-}
-
 .actorGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -823,6 +794,81 @@ main {
   padding: 1rem;
 }
 
+.markdownTableWrap {
+  margin: 1.4rem 0;
+  overflow-x: auto;
+  border: 1px solid rgba(111, 29, 27, 0.12);
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 251, 0.98)),
+    linear-gradient(90deg, rgba(185, 28, 28, 0.05), rgba(185, 28, 28, 0));
+  box-shadow:
+    0 16px 40px rgba(17, 17, 17, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.markdownTable {
+  width: 100%;
+  min-width: 38rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.markdownTableHead {
+  position: relative;
+}
+
+.markdownTableRow:nth-child(even) {
+  background: rgba(248, 249, 251, 0.9);
+}
+
+.markdownTableBody .markdownTableRow:hover {
+  background: rgba(254, 226, 226, 0.4);
+}
+
+.markdownTableHeaderCell,
+.markdownTableCell {
+  padding: 0.95rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  border-right: 1px solid rgba(229, 231, 235, 0.9);
+  border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+  text-wrap: pretty;
+}
+
+.markdownTableHeaderCell:last-child,
+.markdownTableCell:last-child {
+  border-right: 0;
+}
+
+.markdownTableHeaderCell {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, #fff5f5 0%, #ffe4e6 100%);
+  color: #7f1d1d;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.markdownTableCell {
+  color: var(--foreground);
+  background: transparent;
+}
+
+.markdownTableBody .markdownTableCell:first-child {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.markdownTableBody .markdownTableRow:last-child .markdownTableCell {
+  border-bottom: 0;
+}
+
 .articleImage,
 .articleAudio {
   display: block;
@@ -894,6 +940,10 @@ main {
   .voteDashboardStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .markdownTable {
+    min-width: 0;
+  }
 }
 
 @media (min-width: 1280px) {
@@ -911,20 +961,19 @@ main {
 }
 
 @media (max-width: 767px) {
-  .pwaBanner {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-top: calc(0.85rem + env(safe-area-inset-top, 0));
+  .markdownTableWrap {
+    margin-left: -0.15rem;
+    margin-right: -0.15rem;
+    border-radius: 1rem;
   }
 
-  .pwaBannerActions {
-    width: 100%;
-    justify-content: flex-start;
+  .markdownTable {
+    min-width: 34rem;
+    font-size: 0.94rem;
   }
-}
 
-@media (display-mode: standalone) {
-  .pwaBanner {
-    padding-top: calc(0.85rem + env(safe-area-inset-top, 0));
+  .markdownTableHeaderCell,
+  .markdownTableCell {
+    padding: 0.8rem 0.85rem;
   }
 }

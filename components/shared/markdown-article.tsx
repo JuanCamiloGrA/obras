@@ -6,6 +6,7 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 
 import { parsePlayContent, type VoteBlockDefinition } from "@/lib/markdown-votes";
+import { normalizeMediaSrc } from "@/lib/media";
 import { remarkHighlightActor } from "@/lib/markdown-highlights";
 import { STORAGE_KEY_PREFIX } from "@/lib/constants";
 import type { ActorSummary, AssignmentSummary } from "@/lib/types";
@@ -387,15 +388,34 @@ export function MarkdownArticle({
             components={{
               a: ({ ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
               img: ({ alt, src }) => {
-                if (!src) {
+                if (typeof src !== "string" || !src) {
                   return null;
                 }
 
-                // Uploaded images are plain local files from admin content.
+                const resolvedSrc = normalizeMediaSrc(String(src));
+
                 // eslint-disable-next-line @next/next/no-img-element
-                return <img className="articleImage" src={src} alt={alt || "Imagen de la obra"} />;
+                return <img className="articleImage" src={resolvedSrc} alt={alt || "Imagen de la obra"} />;
               },
-              audio: ({ ...props }) => <audio className="articleAudio" controls {...props} />,
+              audio: ({ src, ...props }) => {
+                if (typeof src !== "string" || !src) {
+                  return null;
+                }
+
+                const resolvedSrc = normalizeMediaSrc(String(src));
+
+                return <audio className="articleAudio" controls {...props} src={resolvedSrc} />;
+              },
+              table: ({ children }) => (
+                <section className="markdownTableWrap" aria-label="Tabla del contenido">
+                  <table className="markdownTable">{children}</table>
+                </section>
+              ),
+              thead: ({ children }) => <thead className="markdownTableHead">{children}</thead>,
+              tbody: ({ children }) => <tbody className="markdownTableBody">{children}</tbody>,
+              tr: ({ children }) => <tr className="markdownTableRow">{children}</tr>,
+              th: ({ children }) => <th className="markdownTableHeaderCell">{children}</th>,
+              td: ({ children }) => <td className="markdownTableCell">{children}</td>,
             }}
           >
             {segment.markdown}

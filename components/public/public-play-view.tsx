@@ -91,9 +91,6 @@ export function PublicPlayView({ play, showListLink = false }: PublicPlayViewPro
             <p className="mutedText">
               {selectedActor ? `Resaltando: ${selectedActor.name}` : "Elige tu nombre para ver tus parlamentos."}
             </p>
-            <p className="pwaNote">
-              Esta obra se guarda en el dispositivo para que puedas seguir ensayando aunque te quedes sin red.
-            </p>
           </div>
 
           <label className="field">
