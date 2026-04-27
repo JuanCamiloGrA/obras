@@ -34,9 +34,24 @@ CREATE TABLE IF NOT EXISTS fragment_assignment_actors (
   PRIMARY KEY (assignment_id, actor_id)
 );
 
+CREATE TABLE IF NOT EXISTS play_votes (
+  play_id TEXT NOT NULL,
+  vote_block_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  option_id TEXT NOT NULL,
+  option_label TEXT NOT NULL,
+  client_updated_at INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (play_id, vote_block_id, actor_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_plays_updated_at ON plays(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_plays_active_public ON plays(is_active, published, hidden);
 CREATE INDEX IF NOT EXISTS idx_actors_play_id ON actors(play_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_play_id ON fragment_assignments(play_id, start_offset);
 CREATE INDEX IF NOT EXISTS idx_assignment_actors_assignment_id ON fragment_assignment_actors(assignment_id);
 CREATE INDEX IF NOT EXISTS idx_assignment_actors_actor_id ON fragment_assignment_actors(actor_id);
+CREATE INDEX IF NOT EXISTS idx_play_votes_play_block ON play_votes(play_id, vote_block_id);
+CREATE INDEX IF NOT EXISTS idx_play_votes_actor_id ON play_votes(actor_id);

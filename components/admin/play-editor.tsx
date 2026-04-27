@@ -319,6 +319,28 @@ export function PlayEditor({ play }: PlayEditorProps) {
             </div>
           </section>
 
+          <section className="panel stackSm subtlePanel">
+            <div className="spaceBetween wrapGap startAligned">
+              <div className="stackXs grow">
+                <p className="eyebrow">Bloques de votacion</p>
+                <h2>Insertar una votacion privada</h2>
+                <p className="mutedText">
+                  Los actores deben elegir su nombre para votar. Solo el admin vera los nombres en el panel.
+                </p>
+              </div>
+
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => handleInsert("[vote]\n---\nOpcion 1\n---\nOpcion 2\n\n")}
+              >
+                Insertar bloque
+              </button>
+            </div>
+
+            <div className="selectionBox mono">[vote]{"\n"}---{"\n"}Opcion 1{"\n"}---{"\n"}Opcion 2</div>
+          </section>
+
           <FileUploadControl playId={play.id} onInsert={handleInsert} />
 
           <section className="panel stackMd">
@@ -410,6 +432,66 @@ export function PlayEditor({ play }: PlayEditorProps) {
               ))}
             </div>
           </section>
+
+          <section className="panel stackMd">
+            <div className="spaceBetween wrapGap startAligned">
+              <div className="stackXs grow">
+                <p className="eyebrow">Votaciones</p>
+                <h2>Revision del administrador</h2>
+                <p className="mutedText">
+                  Cada actor conserva un solo voto por bloque. Si vuelve a votar, se reemplaza el anterior.
+                </p>
+              </div>
+
+              <button className="button ghost" type="button" onClick={() => router.refresh()} disabled={isPending}>
+                Actualizar votos
+              </button>
+            </div>
+
+            {play.votes.length ? null : (
+              <p className="mutedText">
+                Aun no hay bloques de votacion. Inserta uno en el Markdown con la sintaxis mostrada arriba.
+              </p>
+            )}
+
+            <div className="stackSm">
+              {play.votes.map((vote) => (
+                <article key={vote.id} className="voteReviewCard stackSm">
+                  <div className="spaceBetween wrapGap startAligned">
+                    <div className="stackXs grow">
+                      <h3>{vote.title}</h3>
+                      <p className="mutedText">
+                        {vote.totalVotes} de {play.actors.length} actores han votado en este bloque.
+                      </p>
+                    </div>
+
+                    <span className={`badge ${vote.totalVotes ? "accent" : "muted"}`}>
+                      {vote.totalVotes} voto{vote.totalVotes === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  <div className="voteReviewGrid">
+                    {vote.options.map((option) => (
+                      <section key={option.id} className="voteReviewOption stackXs">
+                        <div className="spaceBetween wrapGap">
+                          <p className="voteReviewOptionLabel">{option.label}</p>
+                          <span className={`badge ${option.voteCount ? "success" : "muted"}`}>
+                            {option.voteCount}
+                          </span>
+                        </div>
+
+                        <p className="mutedText voteReviewNames">
+                          {option.actorNames.length
+                            ? option.actorNames.join(", ")
+                            : "Sin votos registrados en esta opcion todavia."}
+                        </p>
+                      </section>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
 
         <section className="panel stackMd previewPanel">
@@ -433,9 +515,13 @@ export function PlayEditor({ play }: PlayEditorProps) {
           </div>
 
           <MarkdownArticle
+            key={previewActorId || "preview-play"}
             markdown={markdown}
             assignments={play.assignments}
             activeActorId={previewActorId}
+            playId={play.id}
+            actors={play.actors}
+            enableVoting={false}
           />
         </section>
       </section>

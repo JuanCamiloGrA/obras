@@ -127,9 +127,12 @@ export function PublicPlayView({ play, showListLink = false }: PublicPlayViewPro
       </section>
 
       <MarkdownArticle
+        key={selectedActorId || "public-play"}
         markdown={play.markdown}
         assignments={play.assignments}
         activeActorId={selectedActorId}
+        playId={play.id}
+        actors={play.actors}
       />
     </main>
   );

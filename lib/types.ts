@@ -12,6 +12,33 @@ export type AssignmentSummary = {
   actorNames: string[];
 };
 
+export type VoteOption = {
+  id: string;
+  label: string;
+};
+
+export type VoteBallotSummary = {
+  voteId: string;
+  actorId: string;
+  actorName: string;
+  optionId: string;
+  optionLabel: string;
+  updatedAt: string;
+};
+
+export type VoteOptionReview = VoteOption & {
+  voteCount: number;
+  actorNames: string[];
+};
+
+export type VoteReview = {
+  id: string;
+  title: string;
+  totalVotes: number;
+  options: VoteOptionReview[];
+  ballots: VoteBallotSummary[];
+};
+
 export type AdminPlaySummary = {
   id: string;
   title: string;
@@ -22,6 +49,8 @@ export type AdminPlaySummary = {
   updatedAt: string;
   actorCount: number;
   assignmentCount: number;
+  voteBlockCount: number;
+  voteCount: number;
 };
 
 export type AdminPlayDetail = {
@@ -34,6 +63,7 @@ export type AdminPlayDetail = {
   isActive: boolean;
   actors: ActorSummary[];
   assignments: AssignmentSummary[];
+  votes: VoteReview[];
 };
 
 export type PublicPlaySummary = {

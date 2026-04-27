@@ -1,10 +1,12 @@
 import { d1Execute, d1First, d1Query } from "@/lib/d1";
+import { buildVoteReviews, parsePlayContent } from "@/lib/markdown-votes";
 import type {
   AdminPlayDetail,
   AdminPlaySummary,
   AssignmentSummary,
   PublicPlayDetail,
   PublicPlaySummary,
+  VoteBallotSummary,
 } from "@/lib/types";
 import { makeExcerpt } from "@/lib/utils";
 
@@ -19,6 +21,7 @@ type PlayRow = {
   updated_at: string;
   actor_count?: number;
   assignment_count?: number;
+  vote_count?: number;
 };
 
 type ActorRow = {
@@ -40,6 +43,15 @@ type PlayStatusRow = {
   slug: string;
   published: number;
   hidden: number;
+};
+
+type VoteRow = {
+  vote_block_id: string;
+  actor_id: string;
+  actor_name: string;
+  option_id: string;
+  option_label: string;
+  updated_at: string;
 };
 
 function toBool(value: number | string | null | undefined) {
@@ -112,10 +124,37 @@ async function getAssignmentsByPlayId(playId: string) {
   return mapAssignments(rows);
 }
 
+async function getVotesByPlayId(playId: string): Promise<VoteBallotSummary[]> {
+  const rows = await d1Query<VoteRow>(
+    `SELECT
+       vote_block_id,
+       actor_id,
+       actor_name,
+       option_id,
+       option_label,
+       updated_at
+     FROM play_votes
+     WHERE play_id = ?
+     ORDER BY updated_at DESC, actor_name ASC`,
+    [playId],
+  );
+
+  return rows.map((row) => ({
+    voteId: row.vote_block_id,
+    actorId: row.actor_id,
+    actorName: row.actor_name,
+    optionId: row.option_id,
+    optionLabel: row.option_label,
+    updatedAt: row.updated_at,
+  }));
+}
+
 async function buildPlayDetail(play: PlayRow): Promise<AdminPlayDetail> {
-  const [actors, assignments] = await Promise.all([
+  const { votes } = parsePlayContent(play.markdown);
+  const [actors, assignments, voteBallots] = await Promise.all([
     getActorsByPlayId(play.id),
     getAssignmentsByPlayId(play.id),
+    getVotesByPlayId(play.id),
   ]);
 
   return {
@@ -128,6 +167,7 @@ async function buildPlayDetail(play: PlayRow): Promise<AdminPlayDetail> {
     isActive: toBool(play.is_active),
     actors,
     assignments,
+    votes: buildVoteReviews(votes, voteBallots),
   };
 }
 
@@ -201,22 +241,29 @@ export async function getAdminPlayList(): Promise<AdminPlaySummary[]> {
        p.is_active,
        p.updated_at,
        (SELECT COUNT(*) FROM actors a WHERE a.play_id = p.id) AS actor_count,
-       (SELECT COUNT(*) FROM fragment_assignments fa WHERE fa.play_id = p.id) AS assignment_count
-     FROM plays p
-     ORDER BY p.updated_at DESC`,
+       (SELECT COUNT(*) FROM fragment_assignments fa WHERE fa.play_id = p.id) AS assignment_count,
+       (SELECT COUNT(*) FROM play_votes pv WHERE pv.play_id = p.id) AS vote_count
+      FROM plays p
+      ORDER BY p.updated_at DESC`,
   );
 
-  return rows.map((play) => ({
-    id: play.id,
-    title: play.title,
-    slug: play.slug,
-    published: toBool(play.published),
-    hidden: toBool(play.hidden),
-    isActive: toBool(play.is_active),
-    updatedAt: play.updated_at,
-    actorCount: toCount(play.actor_count),
-    assignmentCount: toCount(play.assignment_count),
-  }));
+  return rows.map((play) => {
+    const voteBlockCount = parsePlayContent(play.markdown).votes.length;
+
+    return {
+      id: play.id,
+      title: play.title,
+      slug: play.slug,
+      published: toBool(play.published),
+      hidden: toBool(play.hidden),
+      isActive: toBool(play.is_active),
+      updatedAt: play.updated_at,
+      actorCount: toCount(play.actor_count),
+      assignmentCount: toCount(play.assignment_count),
+      voteBlockCount,
+      voteCount: toCount(play.vote_count),
+    };
+  });
 }
 
 export async function getAdminPlayById(id: string) {
@@ -277,6 +324,22 @@ export async function getPublicPlayBySlug(slug: string) {
      WHERE slug = ? AND published = 1 AND hidden = 0
      LIMIT 1`,
     [slug],
+  );
+
+  if (!play) {
+    return null;
+  }
+
+  return mapPublicPlay(await buildPlayDetail(play));
+}
+
+export async function getPublicPlayById(id: string) {
+  const play = await d1First<PlayRow>(
+    `SELECT id, title, slug, markdown, published, hidden, is_active, updated_at
+     FROM plays
+     WHERE id = ? AND published = 1 AND hidden = 0
+     LIMIT 1`,
+    [id],
   );
 
   if (!play) {
@@ -350,6 +413,7 @@ export async function createActor(playId: string, name: string) {
 
 export async function deleteActor(playId: string, actorId: string) {
   await d1Execute(`DELETE FROM fragment_assignment_actors WHERE actor_id = ?`, [actorId]);
+  await d1Execute(`DELETE FROM play_votes WHERE play_id = ? AND actor_id = ?`, [playId, actorId]);
   await d1Execute(`DELETE FROM actors WHERE id = ?`, [actorId]);
   await cleanupOrphanAssignments(playId);
   await touchPlay(playId);
@@ -404,4 +468,35 @@ export async function deleteAssignment(playId: string, assignmentId: string) {
   await d1Execute(`DELETE FROM fragment_assignment_actors WHERE assignment_id = ?`, [assignmentId]);
   await d1Execute(`DELETE FROM fragment_assignments WHERE id = ?`, [assignmentId]);
   await touchPlay(playId);
+}
+
+export async function saveVote(
+  playId: string,
+  voteId: string,
+  actorId: string,
+  actorName: string,
+  optionId: string,
+  optionLabel: string,
+  clientUpdatedAt: number,
+) {
+  await d1Execute(
+    `INSERT INTO play_votes (
+       play_id,
+       vote_block_id,
+       actor_id,
+       actor_name,
+       option_id,
+       option_label,
+       client_updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(play_id, vote_block_id, actor_id) DO UPDATE SET
+       actor_name = excluded.actor_name,
+       option_id = excluded.option_id,
+       option_label = excluded.option_label,
+       client_updated_at = excluded.client_updated_at,
+       updated_at = CURRENT_TIMESTAMP
+     WHERE excluded.client_updated_at >= play_votes.client_updated_at`,
+    [playId, voteId, actorId, actorName, optionId, optionLabel, clientUpdatedAt],
+  );
 }

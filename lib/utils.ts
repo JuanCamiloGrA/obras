@@ -11,6 +11,7 @@ export function slugify(value: string) {
 
 export function stripMarkdown(markdown: string) {
   return markdown
+    .replace(/\[vote\][\s\S]*?(?=\n\s*\n|$)/g, " ")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
