@@ -669,14 +669,8 @@ main {
 }
 
 .voteOptionCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 1rem;
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.92);
-  text-align: left;
   transition:
     transform 0.15s ease,
     border-color 0.15s ease,
@@ -696,11 +690,91 @@ main {
   box-shadow: 0 18px 32px rgba(111, 29, 27, 0.12);
 }
 
-.voteOptionLabel,
-.voteReviewOptionLabel {
+.voteOptionBody {
+  padding: 1rem;
+}
+
+.voteOptionContent {
+  min-width: 0;
+  white-space: pre-wrap;
+}
+
+.voteOptionContent > * + * {
+  margin-top: 0.8rem;
+}
+
+.voteOptionContent p,
+.voteOptionContent li,
+.voteOptionContent blockquote {
+  color: var(--foreground);
+}
+
+.voteOptionContent ul,
+.voteOptionContent ol {
+  padding-left: 1.25rem;
+}
+
+.voteOptionContent p:first-child,
+.voteOptionContent h1:first-child,
+.voteOptionContent h2:first-child,
+.voteOptionContent h3:first-child {
+  margin-top: 0;
+}
+
+.voteOptionContent > p:first-child {
   font-size: 1rem;
   font-weight: 700;
-  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.voteOptionContent p:last-child,
+.voteOptionContent ul:last-child,
+.voteOptionContent ol:last-child,
+.voteOptionContent .articleImage:last-child,
+.voteOptionContent .articleAudio:last-child,
+.voteOptionContent .markdownTableWrap:last-child {
+  margin-bottom: 0;
+}
+
+.voteOptionContent .articleImage,
+.voteOptionContent .articleAudio,
+.voteReviewOptionLabel .articleImage,
+.voteReviewOptionLabel .articleAudio {
+  margin-top: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.voteOptionAction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: 100%;
+  border: 0;
+  border-radius: 0.9rem;
+  padding: 0.95rem 1rem;
+  background: rgba(17, 17, 17, 0.045);
+  color: var(--foreground);
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.voteOptionAction:hover:not(:disabled) {
+  background: rgba(111, 29, 27, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(111, 29, 27, 0.08);
+}
+
+.voteOptionAction:disabled {
+  opacity: 0.7;
+}
+
+.voteOptionActionLabel {
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .voteOptionMeta {
@@ -716,6 +790,10 @@ main {
 .voteReviewOption {
   padding: 0.9rem;
   background: #fff;
+}
+
+.voteReviewOptionLabel {
+  min-width: 0;
 }
 
 .voteReviewNames {
@@ -870,7 +948,8 @@ main {
 }
 
 .articleImage,
-.articleAudio {
+.articleAudio,
+.customAudioPlayer {
   display: block;
   width: 100%;
   margin-top: 1rem;
@@ -880,6 +959,118 @@ main {
 .articleImage {
   border-radius: 1rem;
   border: 1px solid var(--border);
+}
+
+.customAudioPlayer {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 1.4rem;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 251, 0.98)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.82));
+  box-shadow:
+    0 18px 34px rgba(17, 17, 17, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.audioPlayerNative {
+  display: none;
+}
+
+.audioPlayerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.audioPlayerEyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(111, 29, 27, 0.78);
+}
+
+.audioPlayerTime {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.audioPlayerTimeline {
+  width: 100%;
+  height: 0.8rem;
+  margin: 0;
+  appearance: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(111, 29, 27, 0.9) 0%, rgba(111, 29, 27, 0.9) var(--audio-progress), rgba(17, 17, 17, 0.08) var(--audio-progress), rgba(17, 17, 17, 0.08) 100%);
+  outline: none;
+}
+
+.audioPlayerTimeline:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.audioPlayerTimeline::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: rgba(111, 29, 27, 0.95);
+  box-shadow: 0 6px 12px rgba(111, 29, 27, 0.2);
+}
+
+.audioPlayerTimeline::-moz-range-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: rgba(111, 29, 27, 0.95);
+  box-shadow: 0 6px 12px rgba(111, 29, 27, 0.2);
+}
+
+.audioPlayerControls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.audioPlayerButton {
+  min-height: 3.6rem;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 1rem;
+  background: #fff;
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 700;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.audioPlayerButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(111, 29, 27, 0.24);
+  box-shadow: 0 14px 24px rgba(17, 17, 17, 0.08);
+}
+
+.audioPlayerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.audioPlayerButton.primary {
+  min-height: 4.1rem;
+  background: #fff5f5;
+  color: #7f1d1d;
+  font-size: 1.12rem;
 }
 
 .actor-highlight {
@@ -975,5 +1166,14 @@ main {
   .markdownTableHeaderCell,
   .markdownTableCell {
     padding: 0.8rem 0.85rem;
+  }
+
+  .audioPlayerHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .audioPlayerControls {
+    grid-template-columns: 1fr;
   }
 }

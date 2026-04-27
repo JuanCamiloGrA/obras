@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import remarkGfm from "remark-gfm";
 
 import {
   createActorAction,
@@ -16,6 +19,7 @@ import {
 import { FileUploadControl } from "@/components/admin/file-upload-control";
 import { SelectionContextMenu } from "@/components/admin/selection-context-menu";
 import { MarkdownArticle } from "@/components/shared/markdown-article";
+import { markdownContentComponents } from "@/components/shared/markdown-content";
 import { ADMIN_PANEL_PATH } from "@/lib/constants";
 import type { AdminPlayDetail } from "@/lib/types";
 import { insertAtSelection } from "@/lib/utils";
@@ -870,7 +874,11 @@ export function PlayEditor({ play }: PlayEditorProps) {
                     {vote.options.map((option) => (
                       <section key={option.id} className="voteReviewOption stackXs">
                         <div className="spaceBetween wrapGap">
-                          <p className="voteReviewOptionLabel">{option.label}</p>
+                          <div className="voteReviewOptionLabel voteOptionContent grow">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]} components={markdownContentComponents}>
+                              {option.label}
+                            </ReactMarkdown>
+                          </div>
                           <span className={`badge ${option.voteCount ? "success" : "muted"}`}>
                             {option.voteCount}
                           </span>

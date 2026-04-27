@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { isAdminAuthenticated } from "@/lib/auth";
 import { buildMediaPath } from "@/lib/media";
-import { uploadToR2 } from "@/lib/r2";
+import { createR2UploadUrl } from "@/lib/r2";
 import { sanitizeFilename } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -26,15 +26,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Solo se aceptan imágenes o audios." }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
   const extension = path.extname(file.name) || (file.type.startsWith("image/") ? ".png" : ".mp3");
   const safeName = sanitizeFilename(path.basename(file.name, extension));
   const fileName = `plays/${playId}/${Date.now()}-${safeName}${extension}`;
 
   try {
-    const uploaded = await uploadToR2({
+    const uploaded = await createR2UploadUrl({
       key: fileName,
-      body: buffer,
       contentType: file.type || undefined,
       cacheControl: file.type.startsWith("image/")
         ? "public, max-age=31536000, immutable"
@@ -42,6 +40,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
+      uploadUrl: uploaded.uploadUrl,
       url: buildMediaPath(uploaded.key),
     });
   } catch (error) {

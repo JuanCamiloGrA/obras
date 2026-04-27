@@ -1,4 +1,5 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function getR2Config() {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -73,6 +74,30 @@ export async function uploadToR2(params: {
   return {
     key: params.key,
     url: `${config.publicBaseUrl}/${params.key}`,
+  };
+}
+
+export async function createR2UploadUrl(params: {
+  key: string;
+  contentType?: string;
+  cacheControl?: string;
+  expiresIn?: number;
+}) {
+  const config = getR2Config();
+  const client = getR2Client();
+  const command = new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: params.key,
+    ContentType: params.contentType,
+    CacheControl: params.cacheControl,
+  });
+
+  return {
+    key: params.key,
+    url: `${config.publicBaseUrl}/${params.key}`,
+    uploadUrl: await getSignedUrl(client, command, {
+      expiresIn: params.expiresIn ?? 900,
+    }),
   };
 }
 

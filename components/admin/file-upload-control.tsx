@@ -31,10 +31,25 @@ export function FileUploadControl({ playId, onInsert }: FileUploadControlProps) 
         body: formData,
       });
 
-      const payload = (await response.json()) as { error?: string; url?: string };
+      const payload = (await response.json()) as {
+        error?: string;
+        uploadUrl?: string;
+        url?: string;
+      };
 
-      if (!response.ok || !payload.url) {
+      if (!response.ok || !payload.uploadUrl || !payload.url) {
         setStatus(payload.error || "No se pudo subir el archivo.");
+        return;
+      }
+
+      const uploadResponse = await fetch(payload.uploadUrl, {
+        method: "PUT",
+        headers: file.type ? { "Content-Type": file.type } : undefined,
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        setStatus("No se pudo subir el archivo a R2.");
         return;
       }
 

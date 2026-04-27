@@ -5,8 +5,8 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 
+import { markdownContentComponents } from "@/components/shared/markdown-content";
 import { parsePlayContent, type VoteBlockDefinition } from "@/lib/markdown-votes";
-import { normalizeMediaSrc } from "@/lib/media";
 import { remarkHighlightActor } from "@/lib/markdown-highlights";
 import { STORAGE_KEY_PREFIX } from "@/lib/constants";
 import type { ActorSummary, AssignmentSummary } from "@/lib/types";
@@ -147,6 +147,13 @@ function renderVoteStatus(
   }
 
   const selectedOption = vote.options.find((option) => option.id === selectedOptionId);
+  const selectedOptionSummary = selectedOption?.label
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[#>*_`~-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   if (isPending) {
     return isOnline
@@ -155,7 +162,9 @@ function renderVoteStatus(
   }
 
   if (selectedOption) {
-    return `Voto actual de ${activeActorName}: ${selectedOption.label}`;
+    return selectedOptionSummary
+      ? `Voto actual de ${activeActorName}: ${selectedOptionSummary}`
+      : `Voto actual de ${activeActorName}: opcion seleccionada.`;
   }
 
   return `Selecciona una opcion como ${activeActorName}. Puedes cambiarla despues y solo quedara tu ultimo voto.`;
@@ -338,38 +347,47 @@ export function MarkdownArticle({
                     const isSelected = selectedOptionId === option.id;
 
                     return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`voteOptionCard ${isSelected ? "selected" : ""}`}
-                        disabled={!interactiveVoting || !activeActor}
-                        onClick={() => {
-                          if (!interactiveVoting || !activeActor) {
-                            return;
-                          }
+                      <section key={option.id} className={`voteOptionCard ${isSelected ? "selected" : ""}`}>
+                        <div className="voteOptionBody stackSm">
+                          <div className="voteOptionContent">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]} components={markdownContentComponents}>
+                              {option.label}
+                            </ReactMarkdown>
+                          </div>
 
-                          const submittedAt = Date.now();
+                          <button
+                            type="button"
+                            className="voteOptionAction"
+                            disabled={!interactiveVoting || !activeActor}
+                            onClick={() => {
+                              if (!interactiveVoting || !activeActor) {
+                                return;
+                              }
 
-                          setVoteState((current) => ({
-                            selections: {
-                              ...current.selections,
-                              [segment.vote.id]: option.id,
-                            },
-                            submittedAt: {
-                              ...current.submittedAt,
-                              [segment.vote.id]: submittedAt,
-                            },
-                            pending: current.pending.includes(segment.vote.id)
-                              ? current.pending
-                              : [...current.pending, segment.vote.id],
-                          }));
+                              const submittedAt = Date.now();
 
-                          void syncVote(segment.vote.id, option.id, submittedAt);
-                        }}
-                      >
-                        <span className="voteOptionLabel">{option.label}</span>
-                        <span className="voteOptionMeta">{isSelected ? "Seleccionada" : "Tocar para votar"}</span>
-                      </button>
+                              setVoteState((current) => ({
+                                selections: {
+                                  ...current.selections,
+                                  [segment.vote.id]: option.id,
+                                },
+                                submittedAt: {
+                                  ...current.submittedAt,
+                                  [segment.vote.id]: submittedAt,
+                                },
+                                pending: current.pending.includes(segment.vote.id)
+                                  ? current.pending
+                                  : [...current.pending, segment.vote.id],
+                              }));
+
+                              void syncVote(segment.vote.id, option.id, submittedAt);
+                            }}
+                          >
+                            <span className="voteOptionActionLabel">{isSelected ? "Seleccionada" : "Elegir opcion"}</span>
+                            <span className="voteOptionMeta">{isSelected ? "Puedes cambiar tu voto cuando quieras" : "Tocar para votar"}</span>
+                          </button>
+                        </div>
+                      </section>
                     );
                   })}
                 </div>
@@ -385,38 +403,7 @@ export function MarkdownArticle({
             key={segment.id}
             rehypePlugins={[rehypeRaw]}
             remarkPlugins={[remarkGfm, remarkHighlightActor(segmentRanges)]}
-            components={{
-              a: ({ ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
-              img: ({ alt, src }) => {
-                if (typeof src !== "string" || !src) {
-                  return null;
-                }
-
-                const resolvedSrc = normalizeMediaSrc(String(src));
-
-                // eslint-disable-next-line @next/next/no-img-element
-                return <img className="articleImage" src={resolvedSrc} alt={alt || "Imagen de la obra"} />;
-              },
-              audio: ({ src, ...props }) => {
-                if (typeof src !== "string" || !src) {
-                  return null;
-                }
-
-                const resolvedSrc = normalizeMediaSrc(String(src));
-
-                return <audio className="articleAudio" controls {...props} src={resolvedSrc} />;
-              },
-              table: ({ children }) => (
-                <section className="markdownTableWrap" aria-label="Tabla del contenido">
-                  <table className="markdownTable">{children}</table>
-                </section>
-              ),
-              thead: ({ children }) => <thead className="markdownTableHead">{children}</thead>,
-              tbody: ({ children }) => <tbody className="markdownTableBody">{children}</tbody>,
-              tr: ({ children }) => <tr className="markdownTableRow">{children}</tr>,
-              th: ({ children }) => <th className="markdownTableHeaderCell">{children}</th>,
-              td: ({ children }) => <td className="markdownTableCell">{children}</td>,
-            }}
+            components={markdownContentComponents}
           >
             {segment.markdown}
           </ReactMarkdown>
