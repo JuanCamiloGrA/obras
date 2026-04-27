@@ -1,24 +1,18 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { logoutAdmin, loginAdmin, requireAdmin } from "@/lib/auth";
-import { ADMIN_PANEL_PATH } from "@/lib/constants";
+import { ensureUniqueSlug, revalidatePlayPaths, savePlayDraft } from "@/lib/admin-play-save";
 import {
   createActor,
   createPlay,
   deleteActor,
   deleteAssignment,
-  getPlaySlugById,
   getPlayStatusById,
-  isSlugTaken,
   saveAssignment,
   setPlayActive,
-  updatePlay,
   updatePlayHidden,
   updatePlayPublished,
 } from "@/lib/plays";
-import { slugify } from "@/lib/utils";
 
 type ActionResult = {
   ok: boolean;
@@ -28,34 +22,6 @@ type ActionResult = {
 
 function normalizeBoolean(value: FormDataEntryValue | null) {
   return value === "true";
-}
-
-async function ensureUniqueSlug(baseValue: string, excludeId?: string) {
-  const base = slugify(baseValue) || "obra";
-  let candidate = base;
-  let index = 2;
-
-  while (true) {
-    if (!(await isSlugTaken(candidate, excludeId))) {
-      return candidate;
-    }
-
-    candidate = `${base}-${index}`;
-    index += 1;
-  }
-}
-
-async function revalidatePlayPaths(playId: string) {
-  const slug = await getPlaySlugById(playId);
-
-  revalidatePath("/");
-  revalidatePath("/obras");
-  revalidatePath(ADMIN_PANEL_PATH);
-
-  if (slug) {
-    revalidatePath(`/obras/${slug}`);
-    revalidatePath(`${ADMIN_PANEL_PATH.replace(/\/panel$/, "")}/obras/${playId}`);
-  }
 }
 
 export async function loginAction(formData: FormData): Promise<ActionResult> {
@@ -96,21 +62,13 @@ export async function createPlayAction(formData: FormData): Promise<ActionResult
 export async function savePlayAction(formData: FormData): Promise<ActionResult> {
   await requireAdmin();
 
-  const id = String(formData.get("id") || "");
-  const title = String(formData.get("title") || "").trim();
-  const markdown = String(formData.get("markdown") || "");
-
-  if (!id || !title) {
-    return { ok: false, error: "La obra necesita título." };
-  }
-
-  const slugSource = String(formData.get("slug") || title);
-  const slug = await ensureUniqueSlug(slugSource, id);
-
-  await updatePlay(id, title, slug, markdown);
-
-  await revalidatePlayPaths(id);
-  return { ok: true };
+  return savePlayDraft({
+    id: String(formData.get("id") || ""),
+    title: String(formData.get("title") || ""),
+    slugSource: String(formData.get("slug") || ""),
+    markdown: String(formData.get("markdown") || ""),
+    revalidate: true,
+  });
 }
 
 export async function setPlayPublishedAction(formData: FormData): Promise<ActionResult> {
