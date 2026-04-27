@@ -17,6 +17,32 @@ function isNode(value: unknown): value is GenericNode {
   return typeof value === "object" && value !== null;
 }
 
+function normalizeRanges(ranges: HighlightRange[]) {
+  const sortedRanges = ranges
+    .filter((range) => Number.isFinite(range.startOffset) && Number.isFinite(range.endOffset))
+    .map((range) => ({
+      startOffset: Math.max(0, Math.min(range.startOffset, range.endOffset)),
+      endOffset: Math.max(0, Math.max(range.startOffset, range.endOffset)),
+    }))
+    .filter((range) => range.endOffset > range.startOffset)
+    .sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
+
+  const mergedRanges: HighlightRange[] = [];
+
+  for (const range of sortedRanges) {
+    const previous = mergedRanges.at(-1);
+
+    if (previous && range.startOffset <= previous.endOffset) {
+      previous.endOffset = Math.max(previous.endOffset, range.endOffset);
+      continue;
+    }
+
+    mergedRanges.push({ ...range });
+  }
+
+  return mergedRanges;
+}
+
 function splitTextNode(node: GenericNode, ranges: HighlightRange[]) {
   const value = typeof node.value === "string" ? node.value : "";
   const start = node.position?.start?.offset;
@@ -50,7 +76,7 @@ function splitTextNode(node: GenericNode, ranges: HighlightRange[]) {
       nextChildren.push({
         type: "strong",
         data: {
-          hName: "span",
+          hName: "mark",
           hProperties: {
             className: ["actor-highlight"],
           },
@@ -99,13 +125,13 @@ function transformNode(node: unknown, ranges: HighlightRange[]): GenericNode[] {
 }
 
 export function remarkHighlightActor(ranges: HighlightRange[]) {
-  const sortedRanges = [...ranges].sort((a, b) => a.startOffset - b.startOffset);
+  const normalizedRanges = normalizeRanges(ranges);
 
   return function transformer(tree: unknown) {
-    if (!isNode(tree) || !Array.isArray(tree.children)) {
+    if (!normalizedRanges.length || !isNode(tree) || !Array.isArray(tree.children)) {
       return;
     }
 
-    tree.children = tree.children.flatMap((child) => transformNode(child, sortedRanges));
+    tree.children = tree.children.flatMap((child) => transformNode(child, normalizedRanges));
   };
 }

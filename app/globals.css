@@ -390,6 +390,141 @@ main {
   white-space: pre-wrap;
 }
 
+.markdownEditorFrame {
+  position: relative;
+}
+
+.selectionContextMenu {
+  position: fixed;
+  z-index: 80;
+  width: min(24rem, calc(100vw - 1.5rem));
+  border: 1px solid rgba(111, 29, 27, 0.14);
+  border-radius: 1.1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 250, 245, 0.96)),
+    var(--panel);
+  box-shadow: 0 24px 60px rgba(17, 17, 17, 0.18);
+  padding: 0.8rem;
+}
+
+.selectionContextMenu.above {
+  transform: translate(-50%, -100%);
+}
+
+.selectionContextMenu.below {
+  transform: translate(-50%, 0);
+}
+
+.selectionContextArrow {
+  position: absolute;
+  left: 50%;
+  width: 0.78rem;
+  height: 0.78rem;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(255, 250, 245, 0.98);
+}
+
+.selectionContextMenu.above .selectionContextArrow {
+  bottom: -0.38rem;
+  border-right: 1px solid rgba(111, 29, 27, 0.14);
+  border-bottom: 1px solid rgba(111, 29, 27, 0.14);
+}
+
+.selectionContextMenu.below .selectionContextArrow {
+  top: -0.38rem;
+  border-top: 1px solid rgba(111, 29, 27, 0.14);
+  border-left: 1px solid rgba(111, 29, 27, 0.14);
+}
+
+.selectionContextHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.selectionContextEyebrow {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selectionContextClose {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.05);
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.selectionContextText {
+  display: -webkit-box;
+  margin-top: 0.45rem;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.selectionContextActors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.selectionContextActor {
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--foreground);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.45rem 0.65rem;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.selectionContextActor:hover {
+  transform: translateY(-1px);
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.selectionContextActor.selected {
+  border-color: rgba(185, 28, 28, 0.55);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.selectionContextSave {
+  width: 100%;
+  margin-top: 0.75rem;
+  border: 0;
+  border-radius: 0.85rem;
+  background: var(--foreground);
+  color: #fff;
+  font-weight: 800;
+  padding: 0.72rem 0.9rem;
+}
+
+.selectionContextSave:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .tokenCard,
 .assignmentCard {
   display: flex;
@@ -649,10 +784,15 @@ main {
 
 .actor-highlight {
   display: inline;
-  background: var(--accent-soft);
+  background: linear-gradient(180deg, rgba(254, 240, 138, 0.35), rgba(254, 226, 226, 0.88));
   color: var(--accent);
-  border-radius: 0.35rem;
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-radius: 0.28rem;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.05rem 0.18rem;
+  box-shadow:
+    0 0 0 2px rgba(254, 226, 226, 0.72),
+    inset 0 -0.18em 0 rgba(185, 28, 28, 0.1);
 }
 
 .offlinePage {

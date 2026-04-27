@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +15,7 @@ import {
   setPlayPublishedAction,
 } from "@/app/tramoya/actions";
 import { FileUploadControl } from "@/components/admin/file-upload-control";
+import { SelectionContextMenu } from "@/components/admin/selection-context-menu";
 import { MarkdownArticle } from "@/components/shared/markdown-article";
 import { ADMIN_PANEL_PATH } from "@/lib/constants";
 import type { AdminPlayDetail } from "@/lib/types";
@@ -23,6 +24,78 @@ import { insertAtSelection } from "@/lib/utils";
 type PlayEditorProps = {
   play: AdminPlayDetail;
 };
+
+type SelectionState = {
+  startOffset: number;
+  endOffset: number;
+  selectedText: string;
+};
+
+type SelectionMenuState = SelectionState & {
+  left: number;
+  top: number;
+  placement: "top" | "bottom";
+};
+
+const mirrorProperties = [
+  "boxSizing",
+  "width",
+  "fontFamily",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "letterSpacing",
+  "textTransform",
+  "wordSpacing",
+  "textIndent",
+  "lineHeight",
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+  "borderTopWidth",
+  "borderRightWidth",
+  "borderBottomWidth",
+  "borderLeftWidth",
+] as const;
+
+function getTextareaSelectionAnchor(
+  textarea: HTMLTextAreaElement,
+  offset: number,
+): Pick<SelectionMenuState, "left" | "top" | "placement"> {
+  const textareaRect = textarea.getBoundingClientRect();
+  const computedStyle = window.getComputedStyle(textarea);
+  const mirror = document.createElement("div");
+  const marker = document.createElement("span");
+
+  for (const property of mirrorProperties) {
+    mirror.style[property] = computedStyle[property];
+  }
+
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.overflowWrap = "break-word";
+  mirror.style.wordBreak = "break-word";
+  mirror.style.overflow = "hidden";
+  mirror.style.top = `${textareaRect.top + window.scrollY - textarea.scrollTop}px`;
+  mirror.style.left = `${textareaRect.left + window.scrollX - textarea.scrollLeft}px`;
+  mirror.style.width = `${textarea.clientWidth}px`;
+  mirror.textContent = textarea.value.slice(0, offset);
+  marker.textContent = "\u200b";
+  mirror.append(marker);
+  document.body.append(mirror);
+
+  const markerRect = marker.getBoundingClientRect();
+  mirror.remove();
+  const placement: SelectionMenuState["placement"] = markerRect.top < 220 ? "bottom" : "top";
+
+  return {
+    left: Math.min(Math.max(markerRect.left, 18), window.innerWidth - 18),
+    top: placement === "top" ? markerRect.top - 10 : markerRect.bottom + 10,
+    placement,
+  };
+}
 
 export function PlayEditor({ play }: PlayEditorProps) {
   const router = useRouter();
@@ -38,6 +111,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
     endOffset: 0,
     selectedText: "",
   });
+  const [selectionMenu, setSelectionMenu] = useState<SelectionMenuState | null>(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -51,14 +125,41 @@ export function PlayEditor({ play }: PlayEditorProps) {
 
     const startOffset = textarea.selectionStart;
     const endOffset = textarea.selectionEnd;
-    const selectedText = markdown.slice(startOffset, endOffset).trim();
-
-    setSelection({
+    const selectedText = markdown.slice(startOffset, endOffset);
+    const nextSelection = {
       startOffset,
       endOffset,
       selectedText,
-    });
+    };
+
+    setSelection(nextSelection);
+
+    if (endOffset > startOffset && selectedText.trim()) {
+      setSelectionMenu({
+        ...nextSelection,
+        ...getTextareaSelectionAnchor(textarea, endOffset),
+      });
+      return;
+    }
+
+    setSelectionMenu(null);
   }
+
+  useEffect(() => {
+    if (!selectionMenu) {
+      return;
+    }
+
+    const closeMenu = () => setSelectionMenu(null);
+
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+
+    return () => {
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [selectionMenu]);
 
   function savePlay() {
     const formData = new FormData();
@@ -127,13 +228,14 @@ export function PlayEditor({ play }: PlayEditorProps) {
     });
   }
 
-  function saveAssignment() {
+  function saveAssignment(actorIds = selectedActorIds) {
     const formData = new FormData();
     formData.set("playId", play.id);
     formData.set("startOffset", String(selection.startOffset));
     formData.set("endOffset", String(selection.endOffset));
     formData.set("selectedText", selection.selectedText);
-    formData.set("actorIds", selectedActorIds.join(","));
+    formData.set("actorIds", actorIds.join(","));
+    formData.set("markdown", markdown);
 
     startTransition(async () => {
       setFeedback("");
@@ -146,6 +248,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
       }
 
       setFeedback("Fragmento asignado.");
+      setSelectionMenu(null);
       router.refresh();
     });
   }
@@ -298,16 +401,37 @@ export function PlayEditor({ play }: PlayEditorProps) {
 
             <label className="field">
               <span>Markdown de la obra</span>
-              <textarea
-                ref={textareaRef}
-                value={markdown}
-                onChange={(event) => setMarkdown(event.target.value)}
-                onSelect={refreshSelection}
-                onKeyUp={refreshSelection}
-                rows={22}
-                placeholder="# Acto 1\n\nEscribe el guion aquí..."
-              />
+              <div className="markdownEditorFrame">
+                <textarea
+                  ref={textareaRef}
+                  value={markdown}
+                  onChange={(event) => {
+                    setMarkdown(event.target.value);
+                    setSelectionMenu(null);
+                  }}
+                  onSelect={refreshSelection}
+                  onKeyUp={refreshSelection}
+                  onMouseUp={refreshSelection}
+                  rows={22}
+                  placeholder="# Acto 1\n\nEscribe el guion aquí..."
+                />
+              </div>
             </label>
+
+            {selectionMenu ? (
+              <SelectionContextMenu
+                left={selectionMenu.left}
+                top={selectionMenu.top}
+                placement={selectionMenu.placement}
+                selectedText={selectionMenu.selectedText}
+                actors={play.actors}
+                selectedActorIds={selectedActorIds}
+                disabled={isPending}
+                onToggleActor={toggleSelectedActor}
+                onSave={() => saveAssignment()}
+                onClose={() => setSelectionMenu(null)}
+              />
+            ) : null}
 
             <div className="spaceBetween wrapGap">
               <button className="button primary" type="button" onClick={savePlay} disabled={isPending}>
@@ -384,7 +508,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
             </div>
 
             <div className="selectionBox">
-              {selection.selectedText || "Selecciona un tramo del Markdown para asignarlo."}
+              {selection.selectedText.trim() ? selection.selectedText : "Selecciona un tramo del Markdown para asignarlo."}
             </div>
 
             <p className="mutedText mono">
@@ -404,7 +528,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
               ))}
             </div>
 
-            <button className="button primary" type="button" onClick={saveAssignment} disabled={isPending}>
+            <button className="button primary" type="button" onClick={() => saveAssignment()} disabled={isPending}>
               Guardar fragmento
             </button>
 

@@ -211,13 +211,18 @@ export async function saveAssignmentAction(formData: FormData): Promise<ActionRe
   const startOffset = Number(formData.get("startOffset") || 0);
   const endOffset = Number(formData.get("endOffset") || 0);
   const selectedText = String(formData.get("selectedText") || "");
+  const markdown = String(formData.get("markdown") || "");
   const actorIds = String(formData.get("actorIds") || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
-  if (!selectedText || endOffset <= startOffset) {
+  if (!selectedText.trim() || endOffset <= startOffset) {
     return { ok: false, error: "Selecciona un fragmento válido." };
+  }
+
+  if (markdown && markdown.slice(startOffset, endOffset) !== selectedText) {
+    return { ok: false, error: "La selección ya no coincide con el Markdown actual." };
   }
 
   if (!actorIds.length) {

@@ -13,6 +13,7 @@ import type { ActorSummary, AssignmentSummary } from "@/lib/types";
 type HighlightRange = {
   startOffset: number;
   endOffset: number;
+  selectedText?: string;
 };
 
 type LocalVoteState = {
@@ -85,6 +86,49 @@ function getSegmentRanges(segmentStart: number, segmentEnd: number, ranges: High
   });
 }
 
+function resolveHighlightRange(markdown: string, assignment: AssignmentSummary): HighlightRange | null {
+  const startOffset = Math.max(0, Math.min(assignment.startOffset, markdown.length));
+  const endOffset = Math.max(startOffset, Math.min(assignment.endOffset, markdown.length));
+  const selectedText = assignment.selectedText;
+
+  if (!selectedText.trim()) {
+    return null;
+  }
+
+  const storedSlice = markdown.slice(startOffset, endOffset);
+
+  if (storedSlice === selectedText) {
+    return { startOffset, endOffset, selectedText };
+  }
+
+  if (storedSlice.trim() === selectedText) {
+    const leadingWhitespace = storedSlice.match(/^\s*/)?.[0].length ?? 0;
+    const trailingWhitespace = storedSlice.match(/\s*$/)?.[0].length ?? 0;
+
+    return {
+      startOffset: startOffset + leadingWhitespace,
+      endOffset: endOffset - trailingWhitespace,
+      selectedText,
+    };
+  }
+
+  const firstMatch = markdown.indexOf(selectedText);
+
+  if (firstMatch >= 0 && firstMatch === markdown.lastIndexOf(selectedText)) {
+    return {
+      startOffset: firstMatch,
+      endOffset: firstMatch + selectedText.length,
+      selectedText,
+    };
+  }
+
+  if (endOffset > startOffset) {
+    return { startOffset, endOffset, selectedText };
+  }
+
+  return null;
+}
+
 function renderVoteStatus(
   vote: VoteBlockDefinition,
   selectedOptionId: string,
@@ -124,14 +168,19 @@ export function MarkdownArticle({
   actors = [],
   enableVoting = true,
 }: MarkdownArticleProps) {
-  const ranges = activeActorId
-    ? assignments
-        .filter((assignment) => assignment.actorIds.includes(activeActorId))
-        .map((assignment) => ({
-          startOffset: assignment.startOffset,
-          endOffset: assignment.endOffset,
-        }))
-    : [];
+  const ranges = useMemo(
+    () =>
+      activeActorId
+        ? assignments
+            .filter((assignment) => assignment.actorIds.includes(activeActorId))
+            .flatMap((assignment) => {
+              const range = resolveHighlightRange(markdown, assignment);
+
+              return range ? [range] : [];
+            })
+        : [],
+    [activeActorId, assignments, markdown],
+  );
   const parsedContent = useMemo(() => parsePlayContent(markdown), [markdown]);
   const activeActor = actors.find((actor) => actor.id === activeActorId) ?? null;
   const interactiveVoting = Boolean(enableVoting && playId && actors.length);
