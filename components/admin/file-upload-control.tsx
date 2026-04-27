@@ -21,18 +21,20 @@ export function FileUploadControl({ playId, onInsert }: FileUploadControlProps) 
     setIsUploading(true);
     setStatus("");
 
-    const formData = new FormData();
-    formData.set("playId", playId);
-    formData.set("file", file);
-
     try {
       const response = await fetch("/api/admin/upload", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentType: file.type,
+          fileName: file.name,
+          playId,
+        }),
       });
 
       const payload = (await response.json()) as {
         error?: string;
+        headers?: Record<string, string>;
         uploadUrl?: string;
         url?: string;
       };
@@ -44,7 +46,7 @@ export function FileUploadControl({ playId, onInsert }: FileUploadControlProps) 
 
       const uploadResponse = await fetch(payload.uploadUrl, {
         method: "PUT",
-        headers: file.type ? { "Content-Type": file.type } : undefined,
+        headers: payload.headers,
         body: file,
       });
 

@@ -9,37 +9,49 @@ import { sanitizeFilename } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+type UploadRequest = {
+  playId?: unknown;
+  fileName?: unknown;
+  contentType?: unknown;
+};
+
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-  const playId = String(formData.get("playId") || "general");
+  const payload = (await request.json().catch(() => null)) as UploadRequest | null;
+  const playId = typeof payload?.playId === "string" && payload.playId ? payload.playId : "general";
+  const originalName = typeof payload?.fileName === "string" ? payload.fileName : "";
+  const contentType = typeof payload?.contentType === "string" ? payload.contentType : "";
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Falta el archivo." }, { status: 400 });
+  if (!originalName) {
+    return NextResponse.json({ error: "Falta el nombre del archivo." }, { status: 400 });
   }
 
-  if (!file.type.startsWith("image/") && !file.type.startsWith("audio/")) {
+  if (!contentType.startsWith("image/") && !contentType.startsWith("audio/")) {
     return NextResponse.json({ error: "Solo se aceptan imágenes o audios." }, { status: 400 });
   }
 
-  const extension = path.extname(file.name) || (file.type.startsWith("image/") ? ".png" : ".mp3");
-  const safeName = sanitizeFilename(path.basename(file.name, extension));
+  const extension = path.extname(originalName) || (contentType.startsWith("image/") ? ".png" : ".mp3");
+  const safeName = sanitizeFilename(path.basename(originalName, extension)) || "archivo";
   const fileName = `plays/${playId}/${Date.now()}-${safeName}${extension}`;
+  const cacheControl = contentType.startsWith("image/")
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=604800";
 
   try {
     const uploaded = await createR2UploadUrl({
       key: fileName,
-      contentType: file.type || undefined,
-      cacheControl: file.type.startsWith("image/")
-        ? "public, max-age=31536000, immutable"
-        : "public, max-age=604800",
+      contentType,
+      cacheControl,
     });
 
     return NextResponse.json({
+      headers: {
+        "Cache-Control": cacheControl,
+        "Content-Type": contentType,
+      },
       uploadUrl: uploaded.uploadUrl,
       url: buildMediaPath(uploaded.key),
     });
