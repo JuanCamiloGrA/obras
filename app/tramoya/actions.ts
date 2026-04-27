@@ -20,6 +20,10 @@ type ActionResult = {
   id?: string;
 };
 
+function normalizeLineEndings(value: string) {
+  return value.replace(/\r\n?/g, "\n");
+}
+
 function normalizeBoolean(value: FormDataEntryValue | null) {
   return value === "true";
 }
@@ -168,8 +172,8 @@ export async function saveAssignmentAction(formData: FormData): Promise<ActionRe
   const playId = String(formData.get("playId") || "");
   const startOffset = Number(formData.get("startOffset") || 0);
   const endOffset = Number(formData.get("endOffset") || 0);
-  const selectedText = String(formData.get("selectedText") || "");
-  const markdown = String(formData.get("markdown") || "");
+  const selectedText = normalizeLineEndings(String(formData.get("selectedText") || ""));
+  const markdown = normalizeLineEndings(String(formData.get("markdown") || ""));
   const actorIds = String(formData.get("actorIds") || "")
     .split(",")
     .map((value) => value.trim())
