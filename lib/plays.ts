@@ -365,8 +365,9 @@ export async function updatePlay(id: string, title: string, slug: string, markdo
   await d1Execute(
     `UPDATE plays
      SET title = ?, slug = ?, markdown = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-    [title, slug, markdown, id],
+     WHERE id = ?
+       AND (title <> ? OR slug <> ? OR markdown <> ?)`,
+    [title, slug, markdown, id, title, slug, markdown],
   );
 }
 
