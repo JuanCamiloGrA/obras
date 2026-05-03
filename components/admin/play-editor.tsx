@@ -690,7 +690,7 @@ export function PlayEditor({ play }: PlayEditorProps) {
       </section>
 
       <section className="editorGrid">
-        <div className="stackMd">
+        <div className="stackMd editorMainColumn">
           <section className="panel stackMd">
             <label className="field">
               <span>Título</span>
@@ -929,70 +929,71 @@ export function PlayEditor({ play }: PlayEditorProps) {
             </div>
           </section>
 
-          <section className="panel stackMd">
-            <div className="spaceBetween wrapGap startAligned">
-              <div className="stackXs grow">
-                <p className="eyebrow">Votaciones</p>
-                <h2>Revision del administrador</h2>
-                <p className="mutedText">
-                  Cada actor conserva un solo voto por bloque. Si vuelve a votar, se reemplaza el anterior.
-                </p>
-              </div>
-
-              <button className="button ghost" type="button" onClick={refreshVotes} disabled={isPending}>
-                Actualizar votos
-              </button>
-            </div>
-
-            {play.votes.length ? null : (
-              <p className="mutedText">
-                Aun no hay bloques de votacion. Inserta uno en el Markdown con la sintaxis mostrada arriba.
-              </p>
-            )}
-
-            <div className="stackSm">
-              {play.votes.map((vote) => (
-                <article key={vote.id} className="voteReviewCard stackSm">
-                  <div className="spaceBetween wrapGap startAligned">
-                    <div className="stackXs grow">
-                      <h3>{vote.title}</h3>
-                      <p className="mutedText">
-                        {vote.totalVotes} de {play.actors.length} actores han votado en este bloque.
-                      </p>
-                    </div>
-
-                    <span className={`badge ${vote.totalVotes ? "accent" : "muted"}`}>
-                      {vote.totalVotes} voto{vote.totalVotes === 1 ? "" : "s"}
-                    </span>
-                  </div>
-
-                  <div className="voteReviewGrid">
-                    {vote.options.map((option) => (
-                      <section key={option.id} className="voteReviewOption stackXs">
-                        <div className="spaceBetween wrapGap">
-                          <div className="voteReviewOptionLabel voteOptionContent grow">
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]} components={markdownContentComponents}>
-                              {option.label}
-                            </ReactMarkdown>
-                          </div>
-                          <span className={`badge ${option.voteCount ? "success" : "muted"}`}>
-                            {option.voteCount}
-                          </span>
-                        </div>
-
-                        <p className="mutedText voteReviewNames">
-                          {option.actorNames.length
-                            ? option.actorNames.join(", ")
-                            : "Sin votos registrados en esta opcion todavia."}
-                        </p>
-                      </section>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         </div>
+
+        <section className="panel stackMd voteReviewPanel">
+          <div className="spaceBetween wrapGap startAligned">
+            <div className="stackXs grow">
+              <p className="eyebrow">Votaciones</p>
+              <h2>Revision del administrador</h2>
+              <p className="mutedText">
+                Cada actor conserva un solo voto por bloque. Si vuelve a votar, se reemplaza el anterior.
+              </p>
+            </div>
+
+            <button className="button ghost" type="button" onClick={refreshVotes} disabled={isPending}>
+              Actualizar votos
+            </button>
+          </div>
+
+          {play.votes.length ? null : (
+            <p className="mutedText">
+              Aun no hay bloques de votacion. Inserta uno en el Markdown con la sintaxis mostrada arriba.
+            </p>
+          )}
+
+          <div className="stackSm">
+            {play.votes.map((vote) => (
+              <article key={vote.id} className="voteReviewCard stackSm">
+                <div className="spaceBetween wrapGap startAligned">
+                  <div className="stackXs grow">
+                    <h3>{vote.title}</h3>
+                    <p className="mutedText">
+                      {vote.totalVotes} de {play.actors.length} actores han votado en este bloque.
+                    </p>
+                  </div>
+
+                  <span className={`badge ${vote.totalVotes ? "accent" : "muted"}`}>
+                    {vote.totalVotes} voto{vote.totalVotes === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="voteReviewGrid">
+                  {vote.options.map((option) => (
+                    <section key={option.id} className="voteReviewOption stackXs">
+                      <div className="spaceBetween wrapGap">
+                        <div className="voteReviewOptionLabel voteOptionContent grow">
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]} components={markdownContentComponents}>
+                            {option.label}
+                          </ReactMarkdown>
+                        </div>
+                        <span className={`badge ${option.voteCount ? "success" : "muted"}`}>
+                          {option.voteCount}
+                        </span>
+                      </div>
+
+                      <p className="mutedText voteReviewNames">
+                        {option.actorNames.length
+                          ? option.actorNames.join(", ")
+                          : "Sin votos registrados en esta opcion todavia."}
+                      </p>
+                    </section>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
 
         <section className="panel stackMd previewPanel">
           <div className="spaceBetween wrapGap startAligned">

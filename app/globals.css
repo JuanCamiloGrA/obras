@@ -411,6 +411,12 @@ main {
   gap: 1.25rem;
 }
 
+.editorMainColumn,
+.voteReviewPanel,
+.previewPanel {
+  min-width: 0;
+}
+
 .selectionBox {
   border: 1px dashed var(--border);
   background: var(--subtle);
@@ -1165,7 +1171,22 @@ main {
 
   .editorGrid {
     grid-template-columns: minmax(0, 1.35fr) minmax(24rem, 0.95fr);
+    grid-template-areas:
+      "main preview"
+      "main votes";
     align-items: start;
+  }
+
+  .editorMainColumn {
+    grid-area: main;
+  }
+
+  .previewPanel {
+    grid-area: preview;
+  }
+
+  .voteReviewPanel {
+    grid-area: votes;
   }
 
   .actorGrid {
