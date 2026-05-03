@@ -1,6 +1,6 @@
-const SHELL_CACHE = "ensayo-obras-shell-v1";
-const PAGE_CACHE = "ensayo-obras-pages-v1";
-const ASSET_CACHE = "ensayo-obras-assets-v1";
+const SHELL_CACHE = "ensayo-obras-shell-v2";
+const PAGE_CACHE = "ensayo-obras-pages-v2";
+const ASSET_CACHE = "ensayo-obras-assets-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE_URLS = ["/", "/obras", OFFLINE_URL, "/manifest.webmanifest"];
 
@@ -30,7 +30,15 @@ self.addEventListener("message", (event) => {
     return;
   }
 
-  event.waitUntil(warmCache(event.data.urls));
+  event.waitUntil(
+    warmCache(event.data.urls)
+      .then(() => {
+        event.ports[0]?.postMessage({ ok: true });
+      })
+      .catch(() => {
+        event.ports[0]?.postMessage({ ok: false });
+      }),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -64,7 +72,7 @@ async function warmCache(urls) {
   const pageCache = await caches.open(PAGE_CACHE);
   const assetCache = await caches.open(ASSET_CACHE);
 
-  await Promise.all(
+  const results = await Promise.all(
     urls.map(async (input) => {
       try {
         const url = new URL(input, self.location.origin);
@@ -81,11 +89,16 @@ async function warmCache(urls) {
 
         const targetCache = isDocumentLikeUrl(url) ? pageCache : assetCache;
         await targetCache.put(request, response.clone());
+        return true;
       } catch {
-        // Ignore cache warming failures so the app keeps working online.
+        return false;
       }
     }),
   );
+
+  if (results.some((ok) => !ok)) {
+    throw new Error("cache-warming-failed");
+  }
 }
 
 async function handleNavigationRequest(request) {

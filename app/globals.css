@@ -638,6 +638,26 @@ main {
   z-index: 10;
 }
 
+.offlineDownloadPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 1rem;
+  background: var(--subtle);
+  padding: 0.9rem;
+}
+
+.offlineDownloadPanel.ready {
+  border-color: rgba(15, 118, 110, 0.16);
+  background: rgba(204, 251, 241, 0.48);
+}
+
+.offlineDownloadButton {
+  flex-shrink: 0;
+}
+
 .pickerTitle {
   font-size: 1.2rem;
   font-weight: 700;
@@ -1263,5 +1283,14 @@ main {
 
   .audioPlayerControls {
     grid-template-columns: 1fr;
+  }
+
+  .offlineDownloadPanel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .offlineDownloadButton {
+    width: 100%;
   }
 }

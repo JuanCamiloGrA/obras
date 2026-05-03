@@ -3,35 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+import { PlayDownloadButton } from "@/components/public/play-download-button";
 import { PwaCacheHint } from "@/components/public/pwa-cache-hint";
 import { MarkdownArticle } from "@/components/shared/markdown-article";
 import { STORAGE_KEY_PREFIX } from "@/lib/constants";
+import { extractPlayMediaUrls } from "@/lib/play-offline-assets";
 import type { PublicPlayDetail } from "@/lib/types";
 
 type PublicPlayViewProps = {
   play: PublicPlayDetail;
   showListLink?: boolean;
 };
-
-function extractMediaUrls(markdown: string) {
-  const assetUrls = new Set<string>();
-  const patterns = [
-    /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
-    /<(?:img|audio)\b[^>]*\ssrc=["']([^"']+)["'][^>]*>/gi,
-  ];
-
-  for (const pattern of patterns) {
-    for (const match of markdown.matchAll(pattern)) {
-      const url = match[1]?.trim();
-
-      if (url) {
-        assetUrls.add(url);
-      }
-    }
-  }
-
-  return [...assetUrls];
-}
 
 export function PublicPlayView({ play, showListLink = false }: PublicPlayViewProps) {
   const [query, setQuery] = useState("");
@@ -58,7 +40,7 @@ export function PublicPlayView({ play, showListLink = false }: PublicPlayViewPro
     actor.name.toLowerCase().includes(query.toLowerCase()),
   );
   const selectedActor = play.actors.find((actor) => actor.id === selectedActorId) ?? null;
-  const mediaUrls = useMemo(() => extractMediaUrls(play.markdown), [play.markdown]);
+  const mediaUrls = useMemo(() => extractPlayMediaUrls(play.markdown), [play.markdown]);
   const cacheUrls = useMemo(
     () => ["/", "/obras", `/obras/${play.slug}`, ...mediaUrls],
     [mediaUrls, play.slug],
@@ -120,6 +102,8 @@ export function PublicPlayView({ play, showListLink = false }: PublicPlayViewPro
               Limpiar selección
             </button>
           ) : null}
+
+          <PlayDownloadButton urls={cacheUrls} selectedActorName={selectedActor?.name} />
         </section>
       </section>
 
