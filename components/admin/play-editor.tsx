@@ -15,6 +15,7 @@ import {
   setPlayActiveAction,
   setPlayHiddenAction,
   setPlayPublishedAction,
+  updateActorNameAction,
 } from "@/app/tramoya/actions";
 import { FileUploadControl } from "@/components/admin/file-upload-control";
 import { SelectionContextMenu } from "@/components/admin/selection-context-menu";
@@ -148,6 +149,8 @@ export function PlayEditor({ play }: PlayEditorProps) {
   const [slug, setSlug] = useState(play.slug);
   const [markdown, setMarkdown] = useState(play.markdown);
   const [actorName, setActorName] = useState("");
+  const [editingActorId, setEditingActorId] = useState("");
+  const [editingActorName, setEditingActorName] = useState("");
   const [selectedActorIds, setSelectedActorIds] = useState<string[]>([]);
   const [previewActorId, setPreviewActorId] = useState("");
   const [selection, setSelection] = useState({
@@ -446,6 +449,45 @@ export function PlayEditor({ play }: PlayEditorProps) {
         setPreviewActorId("");
       }
       setFeedback("Actor eliminado.");
+      router.refresh();
+    });
+  }
+
+  function beginRenameActor(actorId: string, name: string) {
+    setEditingActorId(actorId);
+    setEditingActorName(name);
+    setFeedback("");
+    setError("");
+  }
+
+  function cancelRenameActor() {
+    setEditingActorId("");
+    setEditingActorName("");
+  }
+
+  function renameActor(actorId: string) {
+    const formData = new FormData();
+    formData.set("playId", play.id);
+    formData.set("actorId", actorId);
+    formData.set("name", editingActorName);
+
+    startTransition(async () => {
+      if (!(await flushDraft())) {
+        return;
+      }
+
+      setFeedback("");
+      setError("");
+      const result = await updateActorNameAction(formData);
+
+      if (!result.ok) {
+        setError(result.error || "No se pudo cambiar el nombre del actor.");
+        return;
+      }
+
+      setEditingActorId("");
+      setEditingActorName("");
+      setFeedback("Nombre de actor actualizado. Sus fragmentos guardados se conservaron.");
       router.refresh();
     });
   }
@@ -766,14 +808,68 @@ export function PlayEditor({ play }: PlayEditorProps) {
 
             <div className="tokenList">
               {play.actors.length ? null : <p className="mutedText">Aún no hay actores cargados.</p>}
-              {play.actors.map((actor) => (
-                <div key={actor.id} className="tokenCard">
-                  <span>{actor.name}</span>
-                  <button type="button" className="miniButton" onClick={() => deleteActor(actor.id)}>
-                    Eliminar
-                  </button>
-                </div>
-              ))}
+              {play.actors.map((actor) => {
+                const isEditing = editingActorId === actor.id;
+
+                return (
+                  <div key={actor.id} className={`tokenCard actorTokenCard ${isEditing ? "editing" : ""}`}>
+                    {isEditing ? (
+                      <form
+                        className="actorRenameForm"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          renameActor(actor.id);
+                        }}
+                      >
+                        <label className="field actorRenameField">
+                          <span>Nombre del actor</span>
+                          <input
+                            autoFocus
+                            value={editingActorName}
+                            onChange={(event) => setEditingActorName(event.target.value)}
+                          />
+                        </label>
+
+                        <div className="actorRenameActions">
+                          <button className="button primary" type="submit" disabled={isPending}>
+                            Guardar
+                          </button>
+                          <button className="button ghost" type="button" onClick={cancelRenameActor} disabled={isPending}>
+                            Cancelar
+                          </button>
+                        </div>
+
+                        <p className="mutedText actorRenameHint">
+                          Los fragmentos asignados siguen vinculados a este actor y aparecerán con el nombre nuevo.
+                        </p>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="stackXs grow">
+                          <span className="actorTokenName">{actor.name}</span>
+                          {play.assignments.some((assignment) => assignment.actorIds.includes(actor.id)) ? (
+                            <span className="mutedText actorTokenMeta">Con fragmentos guardados</span>
+                          ) : null}
+                        </div>
+
+                        <div className="actorTokenActions">
+                          <button
+                            type="button"
+                            className="miniButton"
+                            onClick={() => beginRenameActor(actor.id, actor.name)}
+                            disabled={isPending}
+                          >
+                            Renombrar
+                          </button>
+                          <button type="button" className="miniButton" onClick={() => deleteActor(actor.id)} disabled={isPending}>
+                            Eliminar
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
 

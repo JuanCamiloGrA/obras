@@ -10,6 +10,7 @@ import {
   getPlayStatusById,
   saveAssignment,
   setPlayActive,
+  updateActorName,
   updatePlayHidden,
   updatePlayPublished,
 } from "@/lib/plays";
@@ -161,6 +162,41 @@ export async function deleteActorAction(formData: FormData): Promise<ActionResul
   const actorId = String(formData.get("actorId") || "");
 
   await deleteActor(playId, actorId);
+
+  await revalidatePlayPaths(playId);
+  return { ok: true };
+}
+
+export async function updateActorNameAction(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+
+  const playId = String(formData.get("playId") || "");
+  const actorId = String(formData.get("actorId") || "");
+  const name = String(formData.get("name") || "").trim();
+
+  if (!actorId) {
+    return { ok: false, error: "Selecciona un actor válido." };
+  }
+
+  if (!name) {
+    return { ok: false, error: "Escribe un nombre para el actor." };
+  }
+
+  try {
+    await updateActorName(playId, actorId, name);
+  } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("unique")) {
+      return {
+        ok: false,
+        error: "Ese actor ya existe en esta obra.",
+      };
+    }
+
+    return {
+      ok: false,
+      error: "No se pudo cambiar el nombre del actor.",
+    };
+  }
 
   await revalidatePlayPaths(playId);
   return { ok: true };

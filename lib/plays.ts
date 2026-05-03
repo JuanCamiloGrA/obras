@@ -412,6 +412,28 @@ export async function createActor(playId: string, name: string) {
   await touchPlay(playId);
 }
 
+export async function updateActorName(playId: string, actorId: string, name: string) {
+  await d1Execute(
+    `UPDATE actors
+     SET name = ?
+     WHERE id = ?
+       AND play_id = ?
+       AND name <> ?`,
+    [name, actorId, playId, name],
+  );
+
+  await d1Execute(
+    `UPDATE play_votes
+     SET actor_name = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE play_id = ?
+       AND actor_id = ?
+       AND actor_name <> ?`,
+    [name, playId, actorId, name],
+  );
+
+  await touchPlay(playId);
+}
+
 export async function deleteActor(playId: string, actorId: string) {
   await d1Execute(`DELETE FROM fragment_assignment_actors WHERE actor_id = ?`, [actorId]);
   await d1Execute(`DELETE FROM play_votes WHERE play_id = ? AND actor_id = ?`, [playId, actorId]);

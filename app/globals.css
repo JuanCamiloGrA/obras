@@ -568,6 +568,43 @@ main {
   padding: 0.75rem 0.9rem;
 }
 
+.actorTokenCard {
+  align-items: flex-start;
+}
+
+.actorTokenCard.editing {
+  border-color: rgba(185, 28, 28, 0.28);
+  background: linear-gradient(180deg, #fff, #fff8f8);
+}
+
+.actorTokenName {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.actorTokenMeta,
+.actorRenameHint {
+  font-size: 0.9rem;
+}
+
+.actorTokenActions,
+.actorRenameActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.actorRenameForm {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.actorRenameField input {
+  min-height: 3rem;
+}
+
 .assignmentText {
   font-weight: 600;
 }
@@ -1161,6 +1198,27 @@ main {
 }
 
 @media (max-width: 767px) {
+  .actorTokenCard,
+  .actorTokenActions,
+  .actorRenameActions {
+    width: 100%;
+  }
+
+  .actorTokenCard {
+    flex-direction: column;
+  }
+
+  .actorTokenActions,
+  .actorRenameActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actorTokenActions .miniButton,
+  .actorRenameActions .button {
+    width: 100%;
+  }
+
   .markdownTableWrap {
     margin-left: -0.15rem;
     margin-right: -0.15rem;
