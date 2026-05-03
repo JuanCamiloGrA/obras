@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type AudioHTMLAttributes, type CSSProperties } from "react";
+import { useRef, useState, type AudioHTMLAttributes } from "react";
 import type { Components } from "react-markdown";
 
 import { normalizeMediaSrc } from "@/lib/media";
@@ -33,15 +33,9 @@ function clampAudioTime(value: number, duration: number) {
 
 export function AudioPlayer({ src, className = "", audioProps }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const timelineId = useId();
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
-  const progress = safeDuration ? Math.min(currentTime / safeDuration, 1) : 0;
-  const playerStyle = {
-    "--audio-progress": `${progress * 100}%`,
-  } as CSSProperties;
 
   const syncCurrentTime = () => {
     const audio = audioRef.current;
@@ -66,38 +60,6 @@ export function AudioPlayer({ src, className = "", audioProps }: AudioPlayerProp
     setCurrentTime((value) => clampAudioTime(value, nextDuration));
   };
 
-  const handleTogglePlayback = async () => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    if (audio.paused) {
-      try {
-        await audio.play();
-      } catch {
-        setIsPlaying(false);
-      }
-
-      return;
-    }
-
-    audio.pause();
-  };
-
-  const handleSeek = (nextValue: number) => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    const boundedValue = clampAudioTime(nextValue, safeDuration);
-    audio.currentTime = boundedValue;
-    setCurrentTime(boundedValue);
-  };
-
   const seekBy = (offset: number) => {
     const audio = audioRef.current;
 
@@ -105,25 +67,13 @@ export function AudioPlayer({ src, className = "", audioProps }: AudioPlayerProp
       return;
     }
 
-    handleSeek(audio.currentTime + offset);
+    const boundedValue = clampAudioTime(audio.currentTime + offset, safeDuration);
+    audio.currentTime = boundedValue;
+    setCurrentTime(boundedValue);
   };
 
   return (
-    <div className={`customAudioPlayer ${className}`.trim()} style={playerStyle}>
-      <audio
-        {...audioProps}
-        ref={audioRef}
-        className="audioPlayerNative"
-        preload="metadata"
-        src={src}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => setIsPlaying(false)}
-        onTimeUpdate={syncCurrentTime}
-        onLoadedMetadata={syncDuration}
-        onDurationChange={syncDuration}
-      />
-
+    <div className={`customAudioPlayer ${className}`.trim()}>
       <div className="audioPlayerHeader">
         <span className="audioPlayerEyebrow">Audio</span>
         <span className="audioPlayerTime">
@@ -131,44 +81,22 @@ export function AudioPlayer({ src, className = "", audioProps }: AudioPlayerProp
         </span>
       </div>
 
-      <input
-        id={timelineId}
-        className="audioPlayerTimeline"
-        type="range"
-        min={0}
-        max={safeDuration || 1}
-        step="any"
-        value={safeDuration ? Math.min(currentTime, safeDuration) : 0}
-        disabled={!safeDuration}
-        aria-label="Progreso del audio"
-        onChange={(event) => handleSeek(Number(event.target.value))}
+      <audio
+        {...audioProps}
+        ref={audioRef}
+        className="audioPlayerNative"
+        controls
+        preload="metadata"
+        src={src}
+        onTimeUpdate={syncCurrentTime}
+        onLoadedMetadata={syncDuration}
+        onDurationChange={syncDuration}
+        onSeeked={syncCurrentTime}
       />
 
       <div className="audioPlayerControls">
         <button type="button" className="audioPlayerButton" onClick={() => seekBy(-10)} disabled={!safeDuration}>
           -10s
-        </button>
-
-        <button type="button" className="audioPlayerButton primary" onClick={handleTogglePlayback}>
-          {isPlaying ? (
-            "Pausa"
-          ) : (
-            <svg
-              className="audioPlayerIcon"
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
-            </svg>
-          )}
         </button>
 
         <button type="button" className="audioPlayerButton" onClick={() => seekBy(10)} disabled={!safeDuration}>
