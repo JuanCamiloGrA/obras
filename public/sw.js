@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (shouldCacheAsset(request, url)) {
-    event.respondWith(handleAssetRequest(request));
+    event.respondWith(request.headers.has("range") ? handleRangeRequest(request) : handleAssetRequest(request));
   }
 });
 
@@ -140,6 +140,48 @@ async function handleAssetRequest(request) {
   }
 }
 
+async function handleRangeRequest(request) {
+  const assetCache = await caches.open(ASSET_CACHE);
+  const cachedResponse = await assetCache.match(request.url);
+
+  if (!cachedResponse) {
+    return fetch(request);
+  }
+
+  const rangeHeader = request.headers.get("range");
+  const range = parseRangeHeader(rangeHeader);
+
+  if (!range) {
+    return cachedResponse;
+  }
+
+  const blob = await cachedResponse.blob();
+  const start = range.start ?? Math.max(blob.size - (range.end ?? blob.size), 0);
+  const end = range.start === undefined ? blob.size - 1 : Math.min(range.end ?? blob.size - 1, blob.size - 1);
+
+  if (start >= blob.size || end < start) {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${blob.size}`,
+      },
+    });
+  }
+
+  const headers = new Headers(cachedResponse.headers);
+  const slicedBlob = blob.slice(start, end + 1, headers.get("Content-Type") || undefined);
+
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Content-Length", String(slicedBlob.size));
+  headers.set("Content-Range", `bytes ${start}-${end}/${blob.size}`);
+
+  return new Response(slicedBlob, {
+    status: 206,
+    statusText: "Partial Content",
+    headers,
+  });
+}
+
 async function fetchAndCache(request, cache) {
   const response = await fetch(request);
 
@@ -164,6 +206,27 @@ function isDocumentLikeUrl(url) {
 
 function isAdminPath(pathname) {
   return pathname.startsWith("/tramoya") || pathname.startsWith("/api/admin");
+}
+
+function parseRangeHeader(rangeHeader) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader || "");
+
+  if (!match) {
+    return null;
+  }
+
+  const start = match[1] ? Number(match[1]) : undefined;
+  const end = match[2] ? Number(match[2]) : undefined;
+
+  if (
+    (start === undefined && end === undefined) ||
+    (start !== undefined && !Number.isSafeInteger(start)) ||
+    (end !== undefined && !Number.isSafeInteger(end))
+  ) {
+    return null;
+  }
+
+  return { start, end };
 }
 
 function isCacheableResponse(response) {

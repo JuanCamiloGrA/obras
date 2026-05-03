@@ -17,15 +17,20 @@ type R2ReadableBody = {
   transformToByteArray?: () => Promise<Uint8Array>;
 };
 
-function createMediaHeaders(object: Awaited<ReturnType<typeof getR2Object>>) {
+function createMediaHeaders(object: Awaited<ReturnType<typeof getR2Object>>, range?: string | null) {
   const headers = new Headers();
 
   headers.set("Cache-Control", object.CacheControl || "public, max-age=31536000, immutable");
   headers.set("Content-Type", object.ContentType || "application/octet-stream");
   headers.set("Content-Disposition", "inline");
+  headers.set("Accept-Ranges", "bytes");
 
   if (typeof object.ContentLength === "number" && object.ContentLength > 0) {
     headers.set("Content-Length", String(object.ContentLength));
+  }
+
+  if (range && object.ContentRange) {
+    headers.set("Content-Range", object.ContentRange);
   }
 
   if (object.ETag) {
@@ -39,22 +44,25 @@ function createMediaHeaders(object: Awaited<ReturnType<typeof getR2Object>>) {
   return headers;
 }
 
-export async function GET(_: Request, { params }: MediaRouteProps) {
+export async function GET(request: Request, { params }: MediaRouteProps) {
   const { key } = await params;
   const objectKey = decodeMediaRouteKey(key);
+  const range = request.headers.get("range");
 
   if (!objectKey) {
     return NextResponse.json({ error: "Archivo no encontrado." }, { status: 404 });
   }
 
   try {
-    const object = await getR2Object(objectKey);
+    const object = await getR2Object(objectKey, range ?? undefined);
     const body = object.Body as R2ReadableBody | undefined;
-    const headers = createMediaHeaders(object);
+    const headers = createMediaHeaders(object, range);
+    const status = range && object.ContentRange ? 206 : 200;
 
     if (body?.transformToWebStream) {
       return new Response(body.transformToWebStream(), {
         headers,
+        status,
       });
     }
 
@@ -63,13 +71,18 @@ export async function GET(_: Request, { params }: MediaRouteProps) {
 
       return new Response(new Blob([bytes]), {
         headers,
+        status,
       });
     }
 
     return NextResponse.json({ error: "Archivo sin contenido." }, { status: 404 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo leer el archivo.";
-    const status = /NoSuchKey|not found|not exist/i.test(message) ? 404 : 500;
+    const status = /InvalidRange|Requested Range|416/i.test(message)
+      ? 416
+      : /NoSuchKey|not found|not exist/i.test(message)
+        ? 404
+        : 500;
 
     return NextResponse.json({ error: message }, { status });
   }

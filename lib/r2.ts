@@ -102,7 +102,7 @@ export async function createR2UploadUrl(params: {
   };
 }
 
-export async function getR2Object(key: string) {
+export async function getR2Object(key: string, range?: string) {
   const config = getR2Config();
   const client = getR2Client();
 
@@ -110,6 +110,7 @@ export async function getR2Object(key: string) {
     new GetObjectCommand({
       Bucket: config.bucket,
       Key: key,
+      Range: range,
     }),
   );
 }
